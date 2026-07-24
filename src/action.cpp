@@ -400,6 +400,10 @@ ActionDeclareHeap::generate()
   if (d_smgr.d_sep_heap_declared) return false;
   const TheorySet& enabled = d_smgr.get_enabled_theories();
   if (enabled.find(THEORY_SEP) == enabled.end()) return false;
+  /* cvc5 forbids declare-heap once the solver engine has been initialized
+   * (which a check-sat does). After a reset the heap must be redeclared before
+   * any such call; if we already made one this session, it is too late. */
+  if (d_smgr.d_n_sat_calls > 0) return false;
   /* We need at least one sort usable as a heap location / data sort. */
   static const SortKindSet exclude = {SORT_FUN, SORT_REGLAN};
   if (!d_smgr.has_sort_excluding(exclude, false)) return false;

@@ -3135,6 +3135,10 @@ Cvc5Solver::get_required_options(Theory theory) const
     /* Separation logic is an expert theory, so it is disabled under the
      * restricted safe modes; keep the mode unrestricted. */
     reqopts.emplace("safe-mode", "unrestricted");
+    /* learned-rewrite is unsound on separation logic (known bug), which would
+     * otherwise dominate the check-model failures; disable it so fuzzing can
+     * surface other model-soundness issues. */
+    reqopts.emplace("learned-rewrite", "false");
   }
   return reqopts;
 }
