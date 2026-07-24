@@ -394,6 +394,8 @@ FSM::configure()
 
   auto a_set_logic = new_action<ActionSetLogic>();
 
+  auto a_declare_heap = new_action<ActionDeclareHeap>();
+
   auto t_default = new_action<TransitionDefault>();
   auto t_inputs  = new_action<TransitionCreateInputs>();
   auto t_sorts   = new_action<TransitionCreateSorts>();
@@ -448,9 +450,20 @@ FSM::configure()
   s_opt->add_action(a_setoption, 1);
   s_opt->add_action(t_default, 5, s_sorts);
 
+  const auto& enabled_theories = d_smgr.get_enabled_theories();
+  bool sep_enabled =
+      enabled_theories.find(THEORY_SEP) != enabled_theories.end();
+
   /* State: sorts ........................................................ */
   s_sorts->add_action(a_mksort, 1);
   s_sorts->add_action(a_instsort, 2);
+  /* Declare the separation logic heap once, before any assertion / check-sat.
+   * It is only reachable in the early (pre-assert) states, so it never fires
+   * after the solver has been initialized. */
+  if (sep_enabled)
+  {
+    s_sorts->add_action(a_declare_heap, 5);
+  }
   s_sorts->add_action(t_sorts, 3, s_inputs);
 
   /* State: create inputs ................................................ */
@@ -458,7 +471,10 @@ FSM::configure()
   s_inputs->add_action(a_mkval, 20);
   s_inputs->add_action(a_mksval, 40);
   s_inputs->add_action(a_mkconst, 10);
-  const auto& enabled_theories = d_smgr.get_enabled_theories();
+  if (sep_enabled)
+  {
+    s_inputs->add_action(a_declare_heap, 5);
+  }
   if (enabled_theories.find(THEORY_QUANT) != enabled_theories.end())
   {
     s_inputs->add_action(a_mkvar, 20);

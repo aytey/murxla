@@ -2131,6 +2131,17 @@ Smt2Solver::set_logic(const std::string& logic)
 }
 
 void
+Smt2Solver::declare_heap(Sort loc_sort, Sort data_sort)
+{
+  Smt2Sort* loc  = checked_cast<Smt2Sort*>(loc_sort.get());
+  Smt2Sort* data = checked_cast<Smt2Sort*>(data_sort.get());
+  std::stringstream smt2;
+  smt2 << "(declare-heap (" << loc->get_repr() << " " << data->get_repr()
+       << "))";
+  dump_smt2(smt2.str());
+}
+
+void
 Smt2Solver::reset()
 {
   dump_smt2("(reset)");

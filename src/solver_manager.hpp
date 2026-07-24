@@ -865,6 +865,18 @@ class SolverManager
    */
   bool d_unsat_cores = false;
 
+  /* Separation logic heap --------------------------------------------------
+   *
+   * The heap is declared at most once per run (via declare-heap), which fixes
+   * the location and data sorts used by pto and sep.nil. Reset on reset().
+   */
+  /** True if the separation logic heap has been declared for this run. */
+  bool d_sep_heap_declared = false;
+  /** The location sort of the declared heap (null if not declared). */
+  Sort d_sep_loc_sort = nullptr;
+  /** The data sort of the declared heap (null if not declared). */
+  Sort d_sep_data_sort = nullptr;
+
   /** The number of scope levels previously pushed. */
   uint32_t d_n_push_levels = 0;
 

@@ -124,6 +124,12 @@ enum Theory
    */
   THEORY_SEQ,
   /**
+   * The not yet standardized theory of separation logic, as supported by
+   * cvc5. Introduces a global heap (declared once via declare-heap) and the
+   * spatial operators pto, sep, and wand.
+   */
+  THEORY_SEP,
+  /**
    * The not yet standardized theory of bags, mostly based on
    * <a
    * href="https://cvc5.github.io/docs/cvc5-0.0.7/theories/sets-and-relations.html">

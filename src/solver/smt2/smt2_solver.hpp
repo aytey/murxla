@@ -322,6 +322,10 @@ class Smt2Term : public AbsTerm
           {Op::SET_MINUS, "set.minus"},
           {Op::SET_SINGLETON, "set.singleton"},
           {Op::SET_SUBSET, "set.subset"},
+          /* Separation logic */
+          {Op::SEP_PTO, "pto"},
+          {Op::SEP_STAR, "sep"},
+          {Op::SEP_WAND, "wand"},
           /* Strings */
           {Op::STR_CONCAT, "str.++"},
           {Op::STR_LEN, "str.len"},
@@ -511,6 +515,7 @@ class Smt2Solver : public Solver
   void print_model() override;
 
   void set_logic(const std::string& logic) override;
+  void declare_heap(Sort loc_sort, Sort data_sort) override;
 
   void reset() override;
   void reset_assertions() override;

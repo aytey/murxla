@@ -469,6 +469,32 @@ class ActionSetLogic : public Action
   void run(const std::string& logic);
 };
 
+/**
+ * The action to declare the separation logic heap.
+ *
+ * Picks a location and a data sort, declares the heap once, and records the
+ * chosen sorts in the solver manager so that pto and sep.nil use them.
+ */
+class ActionDeclareHeap : public Action
+{
+ public:
+  /** The name of this action. */
+  inline static const Kind s_name = "declare-heap";
+
+  /**
+   * Constructor.
+   * @param smgr  The associated solver manager.
+   */
+  ActionDeclareHeap(SolverManager& smgr) : Action(smgr, s_name, NONE) {}
+
+  bool generate() override;
+  std::vector<uint64_t> untrace(
+      const std::vector<std::string>& tokens) override;
+
+ private:
+  void run(Sort loc_sort, Sort data_sort);
+};
+
 /** The action to configure solver options. */
 class ActionSetOption : public Action
 {

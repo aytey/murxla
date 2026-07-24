@@ -3414,6 +3414,64 @@ struct Op
 
   /**
    * @}
+   * \addtogroup op-kinds-sep
+   * @{
+   */
+
+  //// Separation logic
+  /**
+   * The points-to operator of separation logic.
+   *
+   * Created with Solver::mk_term() with
+   * - **arity**: 2
+   * - **args**: `{<heap location sort>, <heap data sort>}`
+   * - **indices**: `{}`
+   * - **returns**: `SORT_BOOL`
+   */
+  inline static const Kind SEP_PTO = "OP_SEP_PTO";
+  /**
+   * The separating conjunction (`sep`) operator of separation logic.
+   *
+   * Created with Solver::mk_term() with
+   * - **arity**: `n` (>= 2)
+   * - **args**: `{SORT_BOOL, ...}`
+   * - **indices**: `{}`
+   * - **returns**: `SORT_BOOL`
+   */
+  inline static const Kind SEP_STAR = "OP_SEP_STAR";
+  /**
+   * The separating implication (`wand`) operator of separation logic.
+   *
+   * Created with Solver::mk_term() with
+   * - **arity**: 2
+   * - **args**: `{SORT_BOOL, SORT_BOOL}`
+   * - **indices**: `{}`
+   * - **returns**: `SORT_BOOL`
+   */
+  inline static const Kind SEP_WAND = "OP_SEP_WAND";
+  /**
+   * The empty heap constraint (`sep.emp`) of separation logic.
+   *
+   * Created with Solver::mk_term() with
+   * - **arity**: 0
+   * - **args**: `{}`
+   * - **indices**: `{}`
+   * - **returns**: `SORT_BOOL`
+   */
+  inline static const Kind SEP_EMP = "OP_SEP_EMP";
+  /**
+   * The nil location (`sep.nil`) of separation logic.
+   *
+   * Created with Solver::mk_term() with
+   * - **arity**: 0
+   * - **args**: `{}`
+   * - **indices**: `{}`
+   * - **returns**: the heap location sort
+   */
+  inline static const Kind SEP_NIL = "OP_SEP_NIL";
+
+  /**
+   * @}
    * \addtogroup op-kinds-rels
    * @{
    */

@@ -437,6 +437,14 @@ OpKindManager::add_op_kinds()
   // THEORY_SET); add_op_kind(Op::REL_TCLOSURE, 1, 0, SORT_SET, {SORT_SET},
   // THEORY_SET); add_op_kind(Op::REL_TRANSPOSE, 1, 0, SORT_SET, {SORT_SET},
   // THEORY_SET);
+
+  /* Separation Logic --------------------------------------------------- */
+  // The argument sorts of SEP_PTO are the heap's (dynamically chosen) location
+  // and data sorts; ActionMkTerm handles their selection specially, so the
+  // SORT_ANY placeholders here are not used to pick arguments.
+  add_op_kind(Op::SEP_PTO, 2, 0, SORT_BOOL, {SORT_ANY, SORT_ANY}, THEORY_SEP);
+  add_op_kind(Op::SEP_STAR, n, 0, SORT_BOOL, {SORT_BOOL}, THEORY_SEP);
+  add_op_kind(Op::SEP_WAND, 2, 0, SORT_BOOL, {SORT_BOOL}, THEORY_SEP);
 }
 
 void

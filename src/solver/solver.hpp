@@ -1847,6 +1847,23 @@ class Solver
   virtual void set_logic(const std::string& logic) {}
 
   /**
+   * Declare the separation logic heap.
+   *
+   * \verbatim embed:rst:leading-asterisk
+   * This configures the (global, once-per-problem) separation logic heap:
+   *
+   *     (declare-heap (<loc_sort> <data_sort>))
+   * \endverbatim
+   *
+   * Must be called after set-logic and before the first assertion / check-sat.
+   * Does nothing by default; only solvers supporting THEORY_SEP override it.
+   *
+   * @param loc_sort   The sort of heap locations.
+   * @param data_sort  The sort of heap data.
+   */
+  virtual void declare_heap(Sort loc_sort, Sort data_sort) {}
+
+  /**
    * Get the current set of assertions.
    *
    * SMT-LIB:

@@ -807,6 +807,9 @@ SolverManager::reset()
   d_model_gen         = false;
   d_unsat_assumptions = false;
   d_unsat_cores       = false;
+  d_sep_heap_declared = false;
+  d_sep_loc_sort      = nullptr;
+  d_sep_data_sort     = nullptr;
   d_n_push_levels     = 0;
   d_sat_called        = false;
   d_sat_result        = Solver::Result::UNKNOWN;
@@ -1489,6 +1492,10 @@ SolverManager::get_sort_kind_data(const TheorySet& theories)
       case THEORY_SEQ:
         sort_kinds.emplace(SORT_SEQ, SortKindData(SORT_SEQ, 1, THEORY_SEQ));
         break;
+
+      /* Separation logic introduces no new sort kind: heap locations and data
+       * are existing sorts, and spatial formulas are Boolean. */
+      case THEORY_SEP: break;
 
       case THEORY_SET:
         sort_kinds.emplace(SORT_SET, SortKindData(SORT_SET, 1, THEORY_SET));

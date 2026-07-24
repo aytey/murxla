@@ -393,6 +393,48 @@ ActionSetLogic::run(const std::string& logic)
 /* -------------------------------------------------------------------------- */
 
 bool
+ActionDeclareHeap::generate()
+{
+  assert(d_solver.is_initialized());
+  /* Declare the heap at most once, and only if separation logic is enabled. */
+  if (d_smgr.d_sep_heap_declared) return false;
+  const TheorySet& enabled = d_smgr.get_enabled_theories();
+  if (enabled.find(THEORY_SEP) == enabled.end()) return false;
+  /* We need at least one sort usable as a heap location / data sort. */
+  static const SortKindSet exclude = {SORT_FUN, SORT_REGLAN};
+  if (!d_smgr.has_sort_excluding(exclude, false)) return false;
+  /* Location and data sorts are picked independently (they may differ). */
+  Sort loc_sort  = d_smgr.pick_sort_excluding(exclude, false);
+  Sort data_sort = d_smgr.pick_sort_excluding(exclude, false);
+  run(loc_sort, data_sort);
+  return true;
+}
+
+std::vector<uint64_t>
+ActionDeclareHeap::untrace(const std::vector<std::string>& tokens)
+{
+  MURXLA_CHECK_TRACE_NTOKENS(2, tokens.size());
+  Sort loc_sort  = get_untraced_sort(untrace_str_to_id(tokens[0]));
+  Sort data_sort = get_untraced_sort(untrace_str_to_id(tokens[1]));
+  MURXLA_CHECK_TRACE_SORT(loc_sort, tokens[0]);
+  MURXLA_CHECK_TRACE_SORT(data_sort, tokens[1]);
+  run(loc_sort, data_sort);
+  return {};
+}
+
+void
+ActionDeclareHeap::run(Sort loc_sort, Sort data_sort)
+{
+  MURXLA_TRACE << get_kind() << " " << loc_sort << " " << data_sort;
+  d_solver.declare_heap(loc_sort, data_sort);
+  d_smgr.d_sep_loc_sort      = loc_sort;
+  d_smgr.d_sep_data_sort     = data_sort;
+  d_smgr.d_sep_heap_declared = true;
+}
+
+/* -------------------------------------------------------------------------- */
+
+bool
 ActionSetOption::generate()
 {
   assert(d_solver.is_initialized());
@@ -1342,6 +1384,13 @@ ActionMkTerm::generate(Op::Kind kind)
 
   ++d_smgr.d_mbt_stats->d_ops[op.d_id];
 
+  /* Separation logic operators require the heap to have been declared, which
+   * fixes the location and data sorts used by pto. */
+  if (op.d_theory == THEORY_SEP && !d_smgr.d_sep_heap_declared)
+  {
+    return false;
+  }
+
   if (kind == Op::DT_APPLY_CONS)
   {
     assert(!n_indices);
@@ -1661,6 +1710,21 @@ ActionMkTerm::generate(Op::Kind kind)
       if (!d_smgr.has_term(element_sort)) return false;
       args.push_back(d_smgr.pick_term(set_sort));
       args.push_back(d_smgr.pick_term(element_sort));
+    }
+    else if (kind == Op::SEP_PTO)
+    {
+      /* pto relates a location term and a data term of the sorts fixed by the
+       * heap declaration. */
+      assert(!n_indices);
+      assert(d_smgr.d_sep_heap_declared);
+      Sort loc_sort  = d_smgr.d_sep_loc_sort;
+      Sort data_sort = d_smgr.d_sep_data_sort;
+      if (!d_smgr.has_term(loc_sort) || !d_smgr.has_term(data_sort))
+      {
+        return false;
+      }
+      args.push_back(d_smgr.pick_term(loc_sort));
+      args.push_back(d_smgr.pick_term(data_sort));
     }
     else if (kind == Op::SET_COMPREHENSION)
     {

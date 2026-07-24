@@ -672,6 +672,10 @@ std::unordered_map<Op::Kind, ::cvc5::Kind> Cvc5Term::s_kinds_to_cvc5_kinds = {
     {Op::SET_MINUS, ::cvc5::Kind::SET_MINUS},
     {Op::SET_SINGLETON, ::cvc5::Kind::SET_SINGLETON},
     {Op::SET_SUBSET, ::cvc5::Kind::SET_SUBSET},
+    // Separation logic
+    {Op::SEP_PTO, ::cvc5::Kind::SEP_PTO},
+    {Op::SEP_STAR, ::cvc5::Kind::SEP_STAR},
+    {Op::SEP_WAND, ::cvc5::Kind::SEP_WAND},
     //{Op::REL_JOIN, ::cvc5::Kind::RELATION_JOIN},
     //{Op::REL_JOIN_IMAGE, ::cvc5::Kind::RELATION_JOIN_IMAGE},
     //{Op::REL_IDEN, ::cvc5::Kind::RELATION_IDEN},
@@ -951,6 +955,10 @@ std::unordered_map<::cvc5::Kind, Op::Kind> Cvc5Term::s_cvc5_kinds_to_kinds = {
     {::cvc5::Kind::SET_MINUS, Op::SET_MINUS},
     {::cvc5::Kind::SET_SINGLETON, Op::SET_SINGLETON},
     {::cvc5::Kind::SET_SUBSET, Op::SET_SUBSET},
+    // Separation logic
+    {::cvc5::Kind::SEP_PTO, Op::SEP_PTO},
+    {::cvc5::Kind::SEP_STAR, Op::SEP_STAR},
+    {::cvc5::Kind::SEP_WAND, Op::SEP_WAND},
     //{::cvc5::Kind::RELATION_JOIN, Op::REL_JOIN},
     //{::cvc5::Kind::RELATION_JOIN_IMAGE, Op::REL_JOIN_IMAGE},
     //{::cvc5::Kind::RELATION_IDEN, Op::REL_IDEN},
@@ -2763,6 +2771,14 @@ Cvc5Solver::set_logic(const std::string& logic)
 }
 
 void
+Cvc5Solver::declare_heap(Sort loc_sort, Sort data_sort)
+{
+  ::cvc5::Sort cvc5_loc  = Cvc5Sort::get_cvc5_sort(loc_sort);
+  ::cvc5::Sort cvc5_data = Cvc5Sort::get_cvc5_sort(data_sort);
+  TRACE_SOLVER(declareSepHeap, cvc5_loc, cvc5_data);
+}
+
+void
 Cvc5Solver::reset()
 {
   d_solver.reset(nullptr);
@@ -3111,6 +3127,11 @@ Cvc5Solver::get_required_options(Theory theory) const
   else if (theory == THEORY_STRING || theory == THEORY_SEQ)
   {
     reqopts.emplace("strings-exp", "true");
+  }
+  else if (theory == THEORY_SEP)
+  {
+    /* cvc5 does not support separation logic with incremental solving. */
+    reqopts.emplace("incremental", "false");
   }
   return reqopts;
 }

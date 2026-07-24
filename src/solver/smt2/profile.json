@@ -12,6 +12,7 @@
       "THEORY_QUANT",
       "THEORY_REAL",
       "THEORY_SEQ",
+      "THEORY_SEP",
       "THEORY_SET",
       "THEORY_STRING",
       "THEORY_TRANSCENDENTAL",

@@ -27,6 +27,7 @@ operator<<(std::ostream& out, Theory theory)
     case THEORY_QUANT: out << "THEORY_QUANT"; break;
     case THEORY_REAL: out << "THEORY_REAL"; break;
     case THEORY_SEQ: out << "THEORY_SEQ"; break;
+    case THEORY_SEP: out << "THEORY_SEP"; break;
     case THEORY_SET: out << "THEORY_SET"; break;
     case THEORY_STRING: out << "THEORY_STRING"; break;
     case THEORY_TRANSCENDENTAL: out << "THEORY_TRANSCENDENTAL"; break;

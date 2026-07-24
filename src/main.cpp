@@ -304,6 +304,7 @@ set_sigint_handler_stats(void)
   "  --[no-]quant                 quantifiers\n"                               \
   "  --[no-]reals                 theory of reals\n"                           \
   "  --[no-]seq                   theory of sequences\n"                       \
+  "  --[no-]sep                   theory of separation logic\n"                 \
   "  --[no-]sets                  theory of sets\n"                            \
   "  --[no-]strings               theory of strings\n"                         \
   "  --[no-]trans                 theory of transcendentals\n"                 \
@@ -703,6 +704,10 @@ parse_options(Options& options, int argc, char* argv[])
     {
       options.enabled_theories.push_back(THEORY_SEQ);
     }
+    else if (arg == "--sep")
+    {
+      options.enabled_theories.push_back(THEORY_SEP);
+    }
     else if (arg == "--sets")
     {
       options.enabled_theories.push_back(THEORY_SET);
@@ -754,6 +759,10 @@ parse_options(Options& options, int argc, char* argv[])
     else if (arg == "--no-seq")
     {
       options.disabled_theories.insert(THEORY_SEQ);
+    }
+    else if (arg == "--no-sep")
+    {
+      options.disabled_theories.insert(THEORY_SEP);
     }
     else if (arg == "--no-sets")
     {

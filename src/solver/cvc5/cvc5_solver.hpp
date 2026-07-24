@@ -310,6 +310,7 @@ class Cvc5Solver : public Solver
   void print_model() override;
 
   void set_logic(const std::string& logic) override;
+  void declare_heap(Sort loc_sort, Sort data_sort) override;
 
   void reset() override;
   void reset_assertions() override;
