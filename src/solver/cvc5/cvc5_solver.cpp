@@ -3255,6 +3255,14 @@ class Cvc5ActionSimplify : public Action
   {
     assert(d_solver.is_initialized());
     if (!d_smgr.has_term()) return false;
+    /* simplify() initializes the solver, and cvc5 forbids declare-heap after
+     * initialization; so when separation logic is enabled, do not simplify
+     * until the heap has been declared. */
+    const TheorySet& et = d_smgr.get_enabled_theories();
+    if (et.find(THEORY_SEP) != et.end() && !d_smgr.d_sep_heap_declared)
+    {
+      return false;
+    }
     Term term = d_smgr.pick_term();
     run(term);
     return true;
