@@ -1981,6 +1981,13 @@ ActionMkTerm::generate(Op::Kind kind)
 
   ++d_smgr.d_mbt_stats->d_ops_ok[op.d_id];
 
+  /* Record that a separation logic term has been created (used to ensure every
+   * checked instance exercises the theory). */
+  if (op.d_theory == THEORY_SEP)
+  {
+    d_smgr.d_sep_term_created = true;
+  }
+
   return true;
 }
 
@@ -3436,6 +3443,15 @@ bool
 ActionCheckSat::generate()
 {
   assert(d_solver.is_initialized());
+  /* When separation logic is enabled, only check sat once the instance
+   * actually uses the theory, so that every checked instance exercises it. */
+  {
+    const TheorySet& et = d_smgr.get_enabled_theories();
+    if (et.find(THEORY_SEP) != et.end() && !d_smgr.d_sep_term_created)
+    {
+      return false;
+    }
+  }
   if (!d_smgr.d_incremental && d_smgr.d_n_sat_calls > 0)
   {
     d_disable = true;
@@ -3469,6 +3485,13 @@ bool
 ActionCheckSatAssuming::generate()
 {
   assert(d_solver.is_initialized());
+  {
+    const TheorySet& et = d_smgr.get_enabled_theories();
+    if (et.find(THEORY_SEP) != et.end() && !d_smgr.d_sep_term_created)
+    {
+      return false;
+    }
+  }
   if (!d_smgr.d_incremental)
   {
     d_disable = true;

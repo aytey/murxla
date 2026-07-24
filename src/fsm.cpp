@@ -484,6 +484,12 @@ FSM::configure()
   s_inputs->add_action(t_inputs, 500, s_push_pop);
 
   /* State: create terms ................................................. */
+  if (sep_enabled)
+  {
+    /* Ensure the heap can still be declared here, so that when check-sat is
+     * gated on a separation logic term the FSM can always make progress. */
+    s_terms->add_action(a_declare_heap, 5);
+  }
   s_terms->add_action(a_mkterm, 5);
   s_terms->add_action(a_mkfun, 50);
   s_terms->add_action(a_termgetchildren, 50);

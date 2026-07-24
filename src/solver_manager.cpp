@@ -810,6 +810,7 @@ SolverManager::reset()
   d_sep_heap_declared = false;
   d_sep_loc_sort      = nullptr;
   d_sep_data_sort     = nullptr;
+  d_sep_term_created  = false;
   d_n_push_levels     = 0;
   d_sat_called        = false;
   d_sat_result        = Solver::Result::UNKNOWN;

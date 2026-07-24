@@ -876,6 +876,12 @@ class SolverManager
   Sort d_sep_loc_sort = nullptr;
   /** The data sort of the declared heap (null if not declared). */
   Sort d_sep_data_sort = nullptr;
+  /**
+   * True once at least one separation logic term has been created. When
+   * separation logic is enabled, check-sat is gated on this so that every
+   * checked instance actually exercises the theory.
+   */
+  bool d_sep_term_created = false;
 
   /** The number of scope levels previously pushed. */
   uint32_t d_n_push_levels = 0;
