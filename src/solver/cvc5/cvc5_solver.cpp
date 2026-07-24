@@ -3132,6 +3132,9 @@ Cvc5Solver::get_required_options(Theory theory) const
   {
     /* cvc5 does not support separation logic with incremental solving. */
     reqopts.emplace("incremental", "false");
+    /* Separation logic is an expert theory, so it is disabled under the
+     * restricted safe modes; keep the mode unrestricted. */
+    reqopts.emplace("safe-mode", "unrestricted");
   }
   return reqopts;
 }
