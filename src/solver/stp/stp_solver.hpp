@@ -103,6 +103,7 @@ class StpTerm : public AbsTerm
   bool is_bv_value() const override;
   bool is_fp_value() const override;
   bool is_rm_value() const override;
+  bool is_special_value(const SpecialValueKind& kind) const override;
   bool is_const() const override;
   bool is_value() const override;
   bool is_var() const override;

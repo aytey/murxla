@@ -11,6 +11,7 @@
 
 #include "stp_solver.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <unordered_set>
@@ -206,6 +207,45 @@ bool
 StpTerm::is_rm_value() const
 {
   return is_value() && get_sort()->is_rm();
+}
+
+bool
+StpTerm::is_special_value(const AbsTerm::SpecialValueKind& kind) const
+{
+  /* For bit-vector special values, derive the answer from the actual constant
+   * bit pattern rather than Murxla's leaf-kind marker. This (a) survives STP's
+   * hash-consing (the marker can be dropped when a value is deduplicated to an
+   * equal cached term) and (b) correctly reports small-width aliasing, e.g. a
+   * 2-bit ONE (01) is also MAX_SIGNED -- mirroring how the btor/bitwuzla
+   * wrappers query the solver node. */
+  if (kind == AbsTerm::SPECIAL_VALUE_BV_ZERO
+      || kind == AbsTerm::SPECIAL_VALUE_BV_ONE
+      || kind == AbsTerm::SPECIAL_VALUE_BV_ONES
+      || kind == AbsTerm::SPECIAL_VALUE_BV_MIN_SIGNED
+      || kind == AbsTerm::SPECIAL_VALUE_BV_MAX_SIGNED)
+  {
+    if (getExprKind(d_term) != BVCONST)
+    {
+      return false;
+    }
+    char* buf         = nullptr;
+    unsigned long len = 0;
+    vc_printBVBitStringToBuffer(d_term, &buf, &len);
+    std::string bits(buf);  // width chars, most-significant bit first
+    free(buf);
+    size_t w = bits.size();
+    if (w == 0) return false;
+    size_t ones = std::count(bits.begin(), bits.end(), '1');
+    if (kind == AbsTerm::SPECIAL_VALUE_BV_ZERO) return ones == 0;
+    if (kind == AbsTerm::SPECIAL_VALUE_BV_ONES) return ones == w;
+    if (kind == AbsTerm::SPECIAL_VALUE_BV_ONE)
+      return ones == 1 && bits[w - 1] == '1';
+    if (kind == AbsTerm::SPECIAL_VALUE_BV_MIN_SIGNED)
+      return bits[0] == '1' && ones == 1;
+    /* SPECIAL_VALUE_BV_MAX_SIGNED: 0 1...1 */
+    return bits[0] == '0' && ones == w - 1;
+  }
+  return AbsTerm::is_special_value(kind);
 }
 
 bool
