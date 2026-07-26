@@ -17,6 +17,9 @@
 #ifdef MURXLA_USE_BITWUZLA
 #include "solver/bitwuzla/bitwuzla_solver.hpp"
 #endif
+#ifdef MURXLA_USE_STP
+#include "solver/stp/stp_solver.hpp"
+#endif
 #include "solver/solver.hpp"
 #include "theory.hpp"
 
@@ -393,6 +396,15 @@ class Smt2Term : public AbsTerm
           {bitwuzla::BitwuzlaTerm::OP_BV_USUBO, "bvusubo"},
           {bitwuzla::BitwuzlaTerm::OP_FP_TO_FP_FROM_REAL, "to_fp"},
           {bitwuzla::BitwuzlaTerm::OP_IFF, "="},
+#endif
+#ifdef MURXLA_USE_STP
+          /* stp-specific operator kinds */
+          {stp::StpSolver::OP_UADDO, "bvuaddo"},
+          {stp::StpSolver::OP_SADDO, "bvsaddo"},
+          {stp::StpSolver::OP_USUBO, "bvusubo"},
+          {stp::StpSolver::OP_SSUBO, "bvssubo"},
+          {stp::StpSolver::OP_UMULO, "bvumulo"},
+          {stp::StpSolver::OP_SMULO, "bvsmulo"},
 #endif
 #ifdef MURXLA_USE_CVC5
           /* cvc5-specific operator kinds */

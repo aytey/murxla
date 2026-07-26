@@ -33,6 +33,7 @@
 #include "solver/meta/shadow_solver.hpp"
 #include "solver/smt2/smt2_solver.hpp"
 #include "solver/solver_profile.hpp"
+#include "solver/stp/stp_solver.hpp"
 #include "solver/yices/yices_solver.hpp"
 #include "statistics.hpp"
 #include "util.hpp"
@@ -680,6 +681,12 @@ Murxla::new_solver(SolverSeedGenerator& sng,
   {
 #if MURXLA_USE_YICES
     return new yices::YicesSolver(sng);
+#endif
+  }
+  else if (solver_kind == SOLVER_STP)
+  {
+#if MURXLA_USE_STP
+    return new stp::StpSolver(sng);
 #endif
   }
   else if (solver_kind == SOLVER_SMT2)

@@ -32,6 +32,7 @@ set(murxla_src_files
   solver/cvc5/cvc5_tracer.cpp
   solver/yices/yices_solver.cpp
   solver/smt2/smt2_solver.cpp
+  solver/stp/stp_solver.cpp
   solver/meta/check_solver.cpp
   solver/meta/shadow_solver.cpp
   solver/solver_profile.cpp
@@ -78,6 +79,36 @@ if (Yices_FOUND)
   target_compile_definitions(murxla PUBLIC MURXLA_USE_YICES)
 endif()
 
+if (STP_FOUND)
+  target_include_directories(murxla PRIVATE ${STP_INCLUDE_DIR})
+  target_link_libraries(murxla PRIVATE ${STP_LIBRARIES})
+  target_compile_definitions(murxla PUBLIC MURXLA_USE_STP)
+
+  # Detect optional STP capabilities from the linked library so a single
+  # wrapper adapts to master / symfpu / array-extensionality builds.
+  include(CheckCXXSymbolExists)
+  include(CMakePushCheckState)
+  cmake_push_check_state()
+  set(CMAKE_REQUIRED_INCLUDES ${STP_INCLUDE_DIR})
+  set(CMAKE_REQUIRED_LIBRARIES ${STP_LIBRARIES})
+  check_cxx_symbol_exists(vc_fpType
+    "stp/c_interface.h" STP_HAVE_FPTYPE)
+  check_cxx_symbol_exists(vc_fpRoundingModeVar
+    "stp/c_interface.h" STP_HAVE_FP_RMVAR)
+  check_cxx_symbol_exists(vc_deleteCounterExampleArray
+    "stp/c_interface.h" STP_HAVE_ARRAY_EX)
+  cmake_pop_check_state()
+
+  if (STP_HAVE_FPTYPE AND STP_HAVE_FP_RMVAR)
+    target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_FP)
+    message(STATUS "STP: floating-point support detected")
+  endif()
+  if (STP_HAVE_ARRAY_EX)
+    target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_ARRAY_EX)
+    message(STATUS "STP: array-extensionality support detected")
+  endif()
+endif()
+
 # Generate solver profile headers
 file(GENERATE
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/gen_profile.cmake"
@@ -92,7 +123,7 @@ namespace ${SOLVER} {\n\
 file(WRITE "${PROFILE_OUTPUT_FILE}" "${PROFILE}")]]
 )
 
-foreach(solver btor bitwuzla cvc5 yices smt2)
+foreach(solver btor bitwuzla cvc5 yices smt2 stp)
   set(JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/solver/${solver}/profile.json")
   set(PROFILE_HEADER_FILE

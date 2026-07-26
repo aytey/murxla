@@ -23,6 +23,7 @@ const SolverKind SOLVER_BTOR  = "btor";
 const SolverKind SOLVER_BITWUZLA = "bitwuzla";
 const SolverKind SOLVER_CVC5  = "cvc5";
 const SolverKind SOLVER_SMT2  = "smt2";
+const SolverKind SOLVER_STP   = "stp";
 const SolverKind SOLVER_YICES = "yices";
 
 struct Options
