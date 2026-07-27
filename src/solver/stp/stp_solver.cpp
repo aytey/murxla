@@ -36,10 +36,13 @@ StpSort::hash() const
 {
   size_t res = std::hash<uint32_t>{}(static_cast<uint32_t>(d_kind));
   res = res * 31 + std::hash<uint32_t>{}(d_bv_size);
-  res = res * 31 + std::hash<uint32_t>{}(d_index_size);
-  res = res * 31 + std::hash<uint32_t>{}(d_element_size);
   res = res * 31 + std::hash<uint32_t>{}(d_exp_size);
   res = res * 31 + std::hash<uint32_t>{}(d_sig_size);
+  if (d_kind == SORT_ARRAY)
+  {
+    res = res * 31 + d_index_sort->hash();
+    res = res * 31 + d_element_sort->hash();
+  }
   return res;
 }
 
@@ -47,15 +50,17 @@ bool
 StpSort::equals(const Sort& other) const
 {
   StpSort* stp_sort = checked_cast<StpSort*>(other.get());
-  if (stp_sort)
+  if (!stp_sort || d_kind != stp_sort->d_kind)
   {
-    return d_kind == stp_sort->d_kind && d_bv_size == stp_sort->d_bv_size
-           && d_index_size == stp_sort->d_index_size
-           && d_element_size == stp_sort->d_element_size
-           && d_exp_size == stp_sort->d_exp_size
-           && d_sig_size == stp_sort->d_sig_size;
+    return false;
   }
-  return false;
+  if (d_kind == SORT_ARRAY)
+  {
+    return d_index_sort->equals(stp_sort->d_index_sort)
+           && d_element_sort->equals(stp_sort->d_element_sort);
+  }
+  return d_bv_size == stp_sort->d_bv_size && d_exp_size == stp_sort->d_exp_size
+         && d_sig_size == stp_sort->d_sig_size;
 }
 
 std::string
@@ -79,8 +84,8 @@ StpSort::to_string() const
            + std::to_string(d_sig_size) + ")";
   }
   assert(d_kind == SORT_ARRAY);
-  return "(Array (_ BitVec " + std::to_string(d_index_size) + ") (_ BitVec "
-         + std::to_string(d_element_size) + "))";
+  return "(Array " + d_index_sort->to_string() + " " + d_element_sort->to_string()
+         + ")";
 }
 
 bool
@@ -138,14 +143,14 @@ Sort
 StpSort::get_array_index_sort() const
 {
   assert(d_kind == SORT_ARRAY);
-  return std::shared_ptr<StpSort>(new StpSort(d_index_size));
+  return d_index_sort;
 }
 
 Sort
 StpSort::get_array_element_sort() const
 {
   assert(d_kind == SORT_ARRAY);
-  return std::shared_ptr<StpSort>(new StpSort(d_element_size));
+  return d_element_sort;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -338,19 +343,22 @@ StpSolver::get_profile() const
   auto profile = nlohmann::json::parse(s_profile);
 
 #ifdef MURXLA_STP_HAVE_FP
-  /* This STP supports floating-point (symfpu). Enable THEORY_FP and keep
-   * arrays bit-vector-only (index and element), since we do not yet wrap
-   * arrays with floating-point elements. STP has no theory of reals, so the
-   * real-valued conversions are excluded (Murxla would not generate them
-   * without THEORY_REAL, but we exclude them defensively). */
+  /* This STP supports floating-point (symfpu). Enable THEORY_FP; STP has no
+   * theory of reals, so the real-valued conversions are excluded (Murxla would
+   * not generate them without THEORY_REAL, but we exclude them defensively). */
   profile["theories"]["include"].push_back("THEORY_FP");
   profile["operators"]["exclude"].push_back("OP_FP_TO_REAL");
   profile["operators"]["exclude"].push_back("OP_FP_TO_FP_FROM_REAL");
+#ifndef MURXLA_STP_HAVE_ARRAY_EX
+  /* FP present but no array extensionality: keep arrays bit-vector-only. The
+   * wrapper only wires FP/RM array index/element sorts for the combined
+   * (qf_abvbf) build, where STP's vc_arrayType accepts them. */
   for (const char* key : {"array-index", "array-element"})
   {
     profile["sorts"][key]["exclude"].push_back("SORT_FP");
     profile["sorts"][key]["exclude"].push_back("SORT_RM");
   }
+#endif
 #endif
 
 #ifdef MURXLA_STP_HAVE_ARRAY_EX
@@ -478,15 +486,16 @@ StpSolver::get_stp_type(Sort sort) const
     case SORT_BV:
       return vc_bvType(d_solver, static_cast<int32_t>(stp_sort->d_bv_size));
     case SORT_ARRAY:
-      return vc_arrayType(
-          d_solver,
-          vc_bvType(d_solver, static_cast<int32_t>(stp_sort->d_index_size)),
-          vc_bvType(d_solver, static_cast<int32_t>(stp_sort->d_element_size)));
+      /* Index and element may each be BV, FP or RM; recurse to build each. */
+      return vc_arrayType(d_solver,
+                          get_stp_type(stp_sort->d_index_sort),
+                          get_stp_type(stp_sort->d_element_sort));
 #ifdef MURXLA_STP_HAVE_FP
     case SORT_FP:
       return vc_fpType(d_solver,
                        static_cast<int32_t>(stp_sort->d_exp_size),
                        static_cast<int32_t>(stp_sort->d_sig_size));
+    case SORT_RM: return vc_fpRoundingModeType(d_solver);
 #endif
     default:
       MURXLA_CHECK_CONFIG(false)
@@ -817,10 +826,20 @@ StpSolver::mk_sort(SortKind kind, const std::vector<Sort>& sorts)
       << "' as argument to StpSolver::mk_sort, expected '" << SORT_ARRAY
       << "'";
   assert(sorts.size() == 2);
+#if defined(MURXLA_STP_HAVE_FP) && defined(MURXLA_STP_HAVE_ARRAY_EX)
+  /* Combined (qf_abvbf) build: index and element may each be BV, FP or RM,
+   * matching STP's generalized vc_arrayType. */
+  for (const Sort& s : sorts)
+  {
+    MURXLA_CHECK_CONFIG(s->is_bv() || s->is_fp() || s->is_rm())
+        << "STP array index/element sorts must be bit-vector, floating-point "
+           "or RoundingMode";
+  }
+#else
   MURXLA_CHECK_CONFIG(sorts[0]->is_bv() && sorts[1]->is_bv())
       << "STP only supports bit-vector index and element sorts for arrays";
-  return std::shared_ptr<StpSort>(
-      new StpSort(sorts[0]->get_bv_size(), sorts[1]->get_bv_size()));
+#endif
+  return std::shared_ptr<StpSort>(new StpSort(sorts[0], sorts[1]));
 }
 
 Expr
@@ -1338,7 +1357,19 @@ StpSolver::mk_term(const Op::Kind& kind,
     }
   }
   MURXLA_TEST(res != nullptr);
-  return std::shared_ptr<StpTerm>(new StpTerm(res));
+  auto res_term = std::shared_ptr<StpTerm>(new StpTerm(res));
+  /* Array-valued results report ARRAY_TYPE with no element/index sort detail on
+   * the STP node (get_sort could only recover widths, not FP/RM element/index
+   * kinds), so attach the full Murxla array sort here from the operands. */
+  if (kind == Op::ARRAY_STORE)
+  {
+    res_term->set_sort(args[0]->get_sort());
+  }
+  else if (kind == Op::ITE && args[1]->get_sort()->is_array())
+  {
+    res_term->set_sort(args[1]->get_sort());
+  }
+  return res_term;
 }
 
 Sort
@@ -1367,9 +1398,17 @@ StpSolver::get_sort(Term term, SortKind sort_kind)
       return std::shared_ptr<StpSort>(
           new StpSort(static_cast<uint32_t>(getVWidth(e))));
     case ARRAY_TYPE:
-      return std::shared_ptr<StpSort>(
-          new StpSort(static_cast<uint32_t>(getIWidth(e)),
-                      static_cast<uint32_t>(getVWidth(e))));
+    {
+      /* Fallback for bit-vector arrays. FP/RM-element/index arrays get their
+       * full sort attached at creation time (see mk_term), so they do not
+       * reach here -- the STP node only exposes widths, not element/index
+       * sort kinds. */
+      Sort index = std::shared_ptr<StpSort>(
+          new StpSort(static_cast<uint32_t>(getIWidth(e))));
+      Sort element = std::shared_ptr<StpSort>(
+          new StpSort(static_cast<uint32_t>(getVWidth(e))));
+      return std::shared_ptr<StpSort>(new StpSort(index, element));
+    }
     default:
       MURXLA_CHECK_CONFIG(false)
           << "StpSolver: term of unknown type in get_sort";

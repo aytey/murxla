@@ -33,11 +33,13 @@ class StpSort : public AbsSort
   StpSort() : d_kind(SORT_BOOL) {}
   /** Construct a bit-vector sort of size bv_size. */
   StpSort(uint32_t bv_size) : d_kind(SORT_BV), d_bv_size(bv_size) {}
-  /** Construct an array sort with given index and element bit-widths. */
-  StpSort(uint32_t index_size, uint32_t element_size)
-      : d_kind(SORT_ARRAY),
-        d_index_size(index_size),
-        d_element_size(element_size)
+  /**
+   * Construct an array sort with the given index and element sorts. Each may
+   * be a bit-vector, floating-point or RoundingMode sort (matching what STP's
+   * generalized vc_arrayType accepts).
+   */
+  StpSort(Sort index, Sort element)
+      : d_kind(SORT_ARRAY), d_index_sort(index), d_element_sort(element)
   {
   }
   /**
@@ -71,10 +73,10 @@ class StpSort : public AbsSort
   SortKind d_kind;
   /** The bit-vector size (SORT_BV only). */
   uint32_t d_bv_size = 0;
-  /** The index bit-width (SORT_ARRAY only). */
-  uint32_t d_index_size = 0;
-  /** The element bit-width (SORT_ARRAY only). */
-  uint32_t d_element_size = 0;
+  /** The index sort (SORT_ARRAY only); a BV, FP or RM sort. */
+  Sort d_index_sort;
+  /** The element sort (SORT_ARRAY only); a BV, FP or RM sort. */
+  Sort d_element_sort;
   /** The exponent bit-width (SORT_FP only). */
   uint32_t d_exp_size = 0;
   /** The significand bit-width, including the hidden bit (SORT_FP only). */
