@@ -955,6 +955,7 @@ Murxla::run_aux(uint64_t seed,
     {
       FSM fsm = create_fsm(
           rng, sng, trace, smt2_out, record_stats, !untrace_file_name.empty());
+      fsm.get_smgr().d_require_fp_or_ext = d_options.require_fp_or_ext;
 
       fsm.configure();
 

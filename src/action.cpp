@@ -2285,6 +2285,30 @@ ActionMkTerm::run(Op::Kind kind,
   d_smgr.add_term(res, sort_kind, args);
   Sort res_sort = res->get_sort();
 
+  /* FP-or-extensionality taint (see --require-fp-or-ext): a term uses FP iff its
+   * sort contains FP/RM anywhere or any operand does; it uses extensionality
+   * iff it is an array equality/distinct, or any operand does. */
+  bool uses_fp  = res_sort->contains_fp();
+  bool uses_ext = false;
+  if (kind == Op::EQUAL || kind == Op::DISTINCT)
+  {
+    for (const Term& a : args)
+    {
+      if (a->get_sort()->is_array())
+      {
+        uses_ext = true;
+        break;
+      }
+    }
+  }
+  for (const Term& a : args)
+  {
+    uses_fp  = uses_fp || a->get_uses_fp();
+    uses_ext = uses_ext || a->get_uses_ext();
+  }
+  res->set_uses_fp(uses_fp);
+  res->set_uses_ext(uses_ext);
+
   MURXLA_TRACE_RETURN << res << " " << res_sort;
   check_term(res);
   return {res->get_id(), res_sort->get_id()};
@@ -2337,6 +2361,30 @@ ActionMkTerm::run(Op::Kind kind,
   }
   d_smgr.add_term(res, sort_kind, args);
   Sort res_sort = res->get_sort();
+
+  /* FP-or-extensionality taint (see --require-fp-or-ext): a term uses FP iff its
+   * sort contains FP/RM anywhere or any operand does; it uses extensionality
+   * iff it is an array equality/distinct, or any operand does. */
+  bool uses_fp  = res_sort->contains_fp();
+  bool uses_ext = false;
+  if (kind == Op::EQUAL || kind == Op::DISTINCT)
+  {
+    for (const Term& a : args)
+    {
+      if (a->get_sort()->is_array())
+      {
+        uses_ext = true;
+        break;
+      }
+    }
+  }
+  for (const Term& a : args)
+  {
+    uses_fp  = uses_fp || a->get_uses_fp();
+    uses_ext = uses_ext || a->get_uses_ext();
+  }
+  res->set_uses_fp(uses_fp);
+  res->set_uses_ext(uses_ext);
 
   MURXLA_TRACE_RETURN << res << " " << res_sort;
   check_term(res);
@@ -2403,6 +2451,30 @@ ActionMkTerm::run(Op::Kind kind,
   // creating a match term and should not be used in any other terms.
   d_smgr.add_term(res, sort_kind, args);
   Sort res_sort = res->get_sort();
+
+  /* FP-or-extensionality taint (see --require-fp-or-ext): a term uses FP iff its
+   * sort contains FP/RM anywhere or any operand does; it uses extensionality
+   * iff it is an array equality/distinct, or any operand does. */
+  bool uses_fp  = res_sort->contains_fp();
+  bool uses_ext = false;
+  if (kind == Op::EQUAL || kind == Op::DISTINCT)
+  {
+    for (const Term& a : args)
+    {
+      if (a->get_sort()->is_array())
+      {
+        uses_ext = true;
+        break;
+      }
+    }
+  }
+  for (const Term& a : args)
+  {
+    uses_fp  = uses_fp || a->get_uses_fp();
+    uses_ext = uses_ext || a->get_uses_ext();
+  }
+  res->set_uses_fp(uses_fp);
+  res->set_uses_ext(uses_ext);
 
   MURXLA_TRACE_RETURN << res << " " << res_sort;
   check_term(res);
@@ -3379,6 +3451,22 @@ ActionCheckSat::generate()
   }
   /* Only call action immediately again with low priority. */
   if (d_smgr.d_sat_called && d_rng.pick_with_prob(95)) return false;
+  /* FP-or-extensionality gate: never solve a pure-BV-without-extensionality
+   * formula. Skipping here means it is never check-sat'd, cross-checked, or
+   * model-checked; the FSM keeps building until FP or array-equality appears. */
+  if (d_smgr.d_require_fp_or_ext)
+  {
+    bool relevant = false;
+    for (const Term& a : d_smgr.assertions())
+    {
+      if (a->get_uses_fp() || a->get_uses_ext())
+      {
+        relevant = true;
+        break;
+      }
+    }
+    if (!relevant) return false;
+  }
   run();
   return true;
 }
@@ -3419,6 +3507,32 @@ ActionCheckSatAssuming::generate()
   for (uint32_t i = 0; i < n_assumptions; ++i)
   {
     assumptions.push_back(d_smgr.pick_term(SORT_BOOL, 0));
+  }
+  /* FP-or-extensionality gate: the solved formula is assertions + assumptions,
+   * so it qualifies if either uses FP or array-equality. */
+  if (d_smgr.d_require_fp_or_ext)
+  {
+    bool relevant = false;
+    for (const Term& a : d_smgr.assertions())
+    {
+      if (a->get_uses_fp() || a->get_uses_ext())
+      {
+        relevant = true;
+        break;
+      }
+    }
+    if (!relevant)
+    {
+      for (const Term& a : assumptions)
+      {
+        if (a->get_uses_fp() || a->get_uses_ext())
+        {
+          relevant = true;
+          break;
+        }
+      }
+    }
+    if (!relevant) return false;
   }
   run(assumptions);
   return true;

@@ -294,6 +294,8 @@ set_sigint_handler_stats(void)
   "                             options for cross check solver\n"              \
   "  -C, --check [<solver>]     check unsat cores/assumptions and \n"          \
   "                             model values with <solver>\n"                  \
+  "  --require-fp-or-ext        only check-sat formulas that use FP/RM\n"       \
+  "                             anywhere or array equality/distinct\n"          \
   "\n"                                                                         \
   " Enable/disable theories:\n"                                                \
   "  --[no-]arrays                theory of arrays\n"                          \
@@ -510,6 +512,11 @@ parse_options(Options& options, int argc, char* argv[])
           << "invalid argument " << solver << " to option '" << arg << "'";
       check_solver(solver);
       options.cross_check = solver;
+    }
+    else if (arg == "--require-fp-or-ext")
+    {
+      record_args.push_back(arg);
+      options.require_fp_or_ext = true;
     }
     else if (arg == "-C" || arg == "--check")
     {

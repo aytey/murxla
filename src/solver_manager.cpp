@@ -204,6 +204,10 @@ SolverManager::add_input(Term& term, Sort& sort, SortKind sort_kind)
   assert(term.get());
 
   d_stats.inputs += 1;
+  /* Leaf FP taint: an input/value uses FP iff its sort contains FP/RM anywhere
+   * (e.g. an FP const, or an (Array _ FP)). Values route through here too.
+   * See --require-fp-or-ext. */
+  term->set_uses_fp(sort->contains_fp());
   d_term_db.add_input(term, sort, sort_kind);
 }
 

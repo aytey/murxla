@@ -146,6 +146,13 @@ class AbsSort
    */
   virtual bool is_rm() const { return false; }
   /**
+   * Determine whether a floating-point or rounding-mode sort appears anywhere
+   * in this sort, including as an array index or element sort (e.g. the FP in
+   * `(Array BV FP)`). Used by the `--require-fp-or-ext` gate.
+   * @return  True if this sort is, or transitively contains, an FP/RM sort.
+   */
+  bool contains_fp() const;
+  /**
    * Determine if this sort is a regular language sort.
    * @return  True if this sort is a RegLan sort. */
   virtual bool is_reglan() const { return false; }
@@ -1119,6 +1126,15 @@ class AbsTerm
    */
   LeafKind get_leaf_kind() const;
 
+  /** @return True if FP/RM appears anywhere in this term (see --require-fp-or-ext). */
+  bool get_uses_fp() const { return d_uses_fp; }
+  /** @return True if this term uses array equality/distinct (see --require-fp-or-ext). */
+  bool get_uses_ext() const { return d_uses_ext; }
+  /** Set the FP-usage taint bit (see --require-fp-or-ext). */
+  void set_uses_fp(bool b) { d_uses_fp = b; }
+  /** Set the extensionality-usage taint bit (see --require-fp-or-ext). */
+  void set_uses_ext(bool b) { d_uses_ext = b; }
+
   /**
    * Cache special arguments for solver-spefic operators that need special
    * treatment, e.g., the real string and the numerator and denominator strings
@@ -1138,6 +1154,14 @@ class AbsTerm
    * LeafKind::NONE if this is not a leaf term.
    */
   LeafKind d_leaf_kind = LeafKind::NONE;
+  /**
+   * FP-or-extensionality taint bits, computed as the term is built and read by
+   * the --require-fp-or-ext check-sat gate.
+   * d_uses_fp : an FP/RM sort appears anywhere in this term's sort or operands.
+   * d_uses_ext: this term is (or contains) an array equality/distinct.
+   */
+  bool d_uses_fp  = false;
+  bool d_uses_ext = false;
   /**
    * The special value kind of this term..
    * SPECIAL_VALUE_NONE if this term is not a value or no special value.

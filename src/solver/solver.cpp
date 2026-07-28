@@ -60,6 +60,23 @@ AbsSort::get_sorts() const
   return d_sorts;
 }
 
+bool
+AbsSort::contains_fp() const
+{
+  if (is_fp() || is_rm())
+  {
+    return true;
+  }
+  for (const Sort& s : get_sorts())
+  {
+    if (s != nullptr && s->contains_fp())
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
 void
 AbsSort::set_associated_sort(Sort sort)
 {

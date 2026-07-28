@@ -833,6 +833,13 @@ class SolverManager
   bool d_arith_linear = false;
 
   /**
+   * True to only run check-sat on formulas that use FP/RM anywhere or array
+   * equality/distinct (extensionality); pure-BV-without-extensionality
+   * check-sats are not generated. Set from Options::require_fp_or_ext.
+   */
+  bool d_require_fp_or_ext = false;
+
+  /**
    * True if all symbols for terms should be of the form '_sX' rather than
    * a random string.
    */

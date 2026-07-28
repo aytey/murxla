@@ -123,6 +123,12 @@ struct Options
 
   /** Print native solver API trace. */
   bool solver_trace = false;
+
+  /**
+   * Only run check-sat on formulas that use FP/RM anywhere or array
+   * equality/distinct (extensionality); skip pure-BV-without-extensionality.
+   */
+  bool require_fp_or_ext = false;
 };
 }  // namespace murxla
 #endif
