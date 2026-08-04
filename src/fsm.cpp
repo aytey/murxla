@@ -485,7 +485,7 @@ FSM::configure()
   s_check_sat->add_action(a_sat, 1);
   s_check_sat->add_action(a_sat_ass, 2);
   s_check_sat->add_action(t_default, 1, s_decide_sat_unsat);
-  s_check_sat->add_action(t_inputs, 2, s_push_pop);
+  s_check_sat->add_action(t_inputs, 3, s_push_pop);  // incremental-stress tweak
   s_check_sat->add_action(t_inputs, 5, s_delete);
 
   /* Decision State: to sat/unsat states ................................. */
@@ -500,16 +500,16 @@ FSM::configure()
   s_unsat->add_action(t_default, 2, s_delete);
 
   /* State: sat .......................................................... */
-  s_sat->add_action(a_printmodel, 1);
-  s_sat->add_action(a_getvalue, 1);
+  s_sat->add_action(a_printmodel, 2);  // incremental-stress tweak: more model reads
+  s_sat->add_action(a_getvalue, 3);    //   between solves (FP/RM get-value path)
   s_sat->add_action(t_default, 2, s_check_sat);
-  s_sat->add_action(t_default, 2, s_push_pop);
+  s_sat->add_action(t_default, 3, s_push_pop);  // more scope churn after a sat model
   s_sat->add_action(t_default, 2, s_delete);
 
   /* State: push_pop ..................................................... */
-  s_push_pop->add_action(a_push, 1);
+  s_push_pop->add_action(a_push, 3);   // incremental-stress tweak: deeper scope nesting
   s_push_pop->add_action(a_pop, 1);
-  s_push_pop->add_action(t_default, 2, s_assert);
+  s_push_pop->add_action(t_default, 3, s_assert);  // build more terms inside open scopes
   s_push_pop->add_action(t_default, 2, s_delete);
   add_action_to_all_states_next(
       t_default, 1, s_push_pop, {State::OPT, State::OPT_REQ});
