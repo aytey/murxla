@@ -241,7 +241,8 @@ ActionNew::run()
 
   d_solver.new_solver();
 
-  d_smgr.d_incremental       = d_solver.option_incremental_enabled();
+  d_smgr.d_incremental =
+      d_smgr.d_force_incremental || d_solver.option_incremental_enabled();
   d_smgr.d_model_gen         = d_solver.option_model_gen_enabled();
   d_smgr.d_unsat_assumptions = d_solver.option_unsat_assumptions_enabled();
   d_smgr.d_unsat_cores       = d_solver.option_unsat_cores_enabled();
@@ -461,7 +462,8 @@ ActionSetOption::run(const std::string& opt, const std::string& value)
   try
   {
     d_solver.set_opt(opt, value);
-    d_smgr.d_incremental       = d_solver.option_incremental_enabled();
+    d_smgr.d_incremental =
+        d_smgr.d_force_incremental || d_solver.option_incremental_enabled();
     d_smgr.d_model_gen         = d_solver.option_model_gen_enabled();
     d_smgr.d_unsat_assumptions = d_solver.option_unsat_assumptions_enabled();
     d_smgr.d_unsat_cores       = d_solver.option_unsat_cores_enabled();

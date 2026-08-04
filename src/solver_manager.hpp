@@ -840,6 +840,13 @@ class SolverManager
   bool d_require_fp_or_ext = false;
 
   /**
+   * True to force incremental mode on for every run, so d_incremental is held
+   * true regardless of what the solver reports or option fuzzing picks.
+   * Set from Options::force_incremental.
+   */
+  bool d_force_incremental = false;
+
+  /**
    * True if all symbols for terms should be of the form '_sX' rather than
    * a random string.
    */

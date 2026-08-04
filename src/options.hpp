@@ -129,6 +129,14 @@ struct Options
    * equality/distinct (extensionality); skip pure-BV-without-extensionality.
    */
   bool require_fp_or_ext = false;
+
+  /**
+   * Force incremental mode on for every run, regardless of what the solver
+   * reports or what option fuzzing would pick, so push/pop, check-sat-assuming
+   * and between-solve model reads are always exercised. Assumes the solver can
+   * solve incrementally.
+   */
+  bool force_incremental = false;
 };
 }  // namespace murxla
 #endif

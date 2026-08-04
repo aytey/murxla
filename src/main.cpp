@@ -296,6 +296,8 @@ set_sigint_handler_stats(void)
   "                             model values with <solver>\n"                  \
   "  --require-fp-or-ext        only check-sat formulas that use FP/RM\n"       \
   "                             anywhere or array equality/distinct\n"          \
+  "  --force-incremental        force incremental mode on every run\n"          \
+  "                             (always exercise push/pop, assumptions)\n"      \
   "\n"                                                                         \
   " Enable/disable theories:\n"                                                \
   "  --[no-]arrays                theory of arrays\n"                          \
@@ -517,6 +519,11 @@ parse_options(Options& options, int argc, char* argv[])
     {
       record_args.push_back(arg);
       options.require_fp_or_ext = true;
+    }
+    else if (arg == "--force-incremental")
+    {
+      record_args.push_back(arg);
+      options.force_incremental = true;
     }
     else if (arg == "-C" || arg == "--check")
     {
