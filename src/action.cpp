@@ -1912,6 +1912,10 @@ ActionMkTerm::generate(Op::Kind kind)
     {
       sort_kind = args[0]->get_sort()->get_kind();
     }
+    /* Let the solver decline operator/argument combinations it supports only
+     * conditionally (e.g., a format-size-limited fp.rem), so we skip this
+     * instance instead of aborting in mk_term. */
+    if (!d_solver.can_apply(kind, args, indices)) return false;
     run(kind, sort_kind, args, indices);
   }
 

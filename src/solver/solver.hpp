@@ -1403,6 +1403,30 @@ class Solver
                        const std::vector<Term>& args,
                        const std::vector<std::string>& special_args = {});
   /**
+   * Vet whether the solver can build the given operator over the given
+   * arguments before mk_term is called.
+   *
+   * The default allows everything. A solver overrides this to decline
+   * operator/argument combinations it supports only conditionally (e.g., an
+   * operator whose circuit is only defined below some format size), so the
+   * fuzzer skips generating that instance rather than aborting in mk_term.
+   * This is a generation-time filter only; it is not consulted during replay.
+   *
+   * @param kind     The kind of the term (Op::Kind).
+   * @param args     The argument terms.
+   * @param indices  The index arguments.
+   * @return  True if mk_term may be called with these arguments.
+   */
+  virtual bool can_apply(const Op::Kind& kind,
+                         const std::vector<Term>& args,
+                         const std::vector<uint32_t>& indices) const
+  {
+    (void) kind;
+    (void) args;
+    (void) indices;
+    return true;
+  }
+  /**
    * Get a freshly wrapped solver sort of the given term.
    *
    * This is used for querying the sort of a freshly created term while
