@@ -177,6 +177,10 @@ class StpSolver : public Solver
                const std::vector<uint32_t>& indices,
                const std::vector<std::string>& special_args = {}) override;
 
+  bool can_apply(const Op::Kind& kind,
+                 const std::vector<Term>& args,
+                 const std::vector<uint32_t>& indices) const override;
+
   Sort get_sort(Term term, SortKind sort_kind) override;
 
   void assert_formula(const Term& t) override;

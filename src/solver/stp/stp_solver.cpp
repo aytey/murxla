@@ -1372,6 +1372,35 @@ StpSolver::mk_term(const Op::Kind& kind,
   return res_term;
 }
 
+bool
+StpSolver::can_apply(const Op::Kind& kind,
+                     const std::vector<Term>& args,
+                     const std::vector<uint32_t>& indices) const
+{
+  (void) indices;
+#ifdef MURXLA_STP_HAVE_FP
+  if (kind == Op::FP_REM)
+  {
+    /* STP blasts fp.rem by unrolling one divide step per representable
+     * exponent difference: 2^eb + sb - 4 steps, capped at REM_UNROLL_LIMIT
+     * (2304); see STP's FloatBlaster::remSupported. vc_fpRemExpr raises a
+     * FatalError above that (i.e. for formats larger than binary64), which
+     * would abort the whole fuzzer, so decline it here and let the generator
+     * pick something else. */
+    assert(args.size() == 2);
+    Sort s = args[0]->get_sort();
+    assert(s->is_fp());
+    uint64_t steps = (uint64_t{1} << s->get_fp_exp_size())
+                     + s->get_fp_sig_size() - 4;
+    if (steps > 2304) return false;
+  }
+#else
+  (void) kind;
+  (void) args;
+#endif
+  return true;
+}
+
 Sort
 StpSolver::get_sort(Term term, SortKind sort_kind)
 {
