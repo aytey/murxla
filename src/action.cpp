@@ -241,6 +241,15 @@ ActionNew::run()
 
   d_solver.new_solver();
 
+  /* With --force-incremental, put the solver itself into incremental mode from
+   * the start (not just pin the manager's flag): set_opt propagates through
+   * the shadow/check wrappers to every underlying solver, so e.g. STP goes
+   * incremental-from-first-query and the cross-check solver stays in step. */
+  if (d_smgr.d_force_incremental)
+  {
+    d_solver.set_opt(d_solver.get_option_name_incremental(), "true");
+  }
+
   d_smgr.d_incremental =
       d_smgr.d_force_incremental || d_solver.option_incremental_enabled();
   d_smgr.d_model_gen         = d_solver.option_model_gen_enabled();
@@ -408,7 +417,9 @@ ActionSetOption::generate()
    *   Boolean values as "true" and "false" (the implementations of class
    *   Solver must support/consider this)
    */
-  if (d_rng.pick_with_prob(100))
+  /* When incremental is forced on it is pinned by ActionNew; don't let option
+   * fuzzing toggle it back off (which would desync the cross-check solver). */
+  if (!d_smgr.d_force_incremental && d_rng.pick_with_prob(100))
   {
     std::tie(opt, value) = d_smgr.pick_option(
         d_solver.get_option_name_incremental(),
