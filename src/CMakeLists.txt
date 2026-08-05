@@ -99,6 +99,15 @@ if (STP_FOUND)
     "stp/c_interface.h" STP_HAVE_ARRAY_EX)
   cmake_pop_check_state()
 
+  # Incremental solving added no new C-API symbol, so detect it by the presence
+  # of its public header (the same branch adds the 'i' flag that process_argument
+  # otherwise rejects with exit(-1)). A plain existence check, not a compile
+  # test: the header pulls in the generated ASTKind.h, which lives in STP's
+  # build tree rather than its include dir.
+  if (EXISTS "${STP_INCLUDE_DIR}/stp/Incremental/IncrementalSolver.h")
+    set(STP_HAVE_INCREMENTAL TRUE)
+  endif()
+
   if (STP_HAVE_FPTYPE AND STP_HAVE_FP_RMVAR)
     target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_FP)
     message(STATUS "STP: floating-point support detected")
@@ -106,6 +115,10 @@ if (STP_FOUND)
   if (STP_HAVE_ARRAY_EX)
     target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_ARRAY_EX)
     message(STATUS "STP: array-extensionality support detected")
+  endif()
+  if (STP_HAVE_INCREMENTAL)
+    target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_INCREMENTAL)
+    message(STATUS "STP: incremental-solving support detected")
   endif()
 endif()
 

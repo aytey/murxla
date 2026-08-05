@@ -465,6 +465,15 @@ StpSolver::set_opt(const std::string& opt, const std::string& value)
   if (opt == get_option_name_incremental())
   {
     d_incremental = value == "true";
+#ifdef MURXLA_STP_HAVE_INCREMENTAL
+    /* Put STP in incremental mode from the very first query, not just from the
+     * first vc_push: with 'i' set, the persistent incremental driver handles
+     * every solve (see docs/incremental-solving.rst). The flag is sticky in
+     * STP, which is fine -- we only ever force it on. Set before any term is
+     * created, which the FSM guarantees (options precede term construction). */
+    if (d_incremental)
+      vc_setFlag(d_solver, 'i');
+#endif
   }
   else if (opt == get_option_name_model_gen())
   {
