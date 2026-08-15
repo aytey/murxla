@@ -486,18 +486,30 @@ StpSolver::get_profile() const
 #endif
 
 #ifdef MURXLA_STP_HAVE_UF
-  /* This STP decides quantifier-free Bool/BV uninterpreted functions
+  /* This STP decides quantifier-free uninterpreted functions
    * (--uninterpreted-functions). Enable THEORY_UF, but constrain it to what
-   * vc_declareUninterpretedFunction accepts: every domain and codomain sort
-   * must be Bool or a nonzero-width bit-vector. */
+   * vc_declareUninterpretedFunction accepts. Arrays are refused by design --
+   * an uninterpreted function is decided by comparing concrete argument
+   * values, and a counterexample gives an array only as a partial map -- and
+   * a function sort is not a term sort at all. */
   profile["theories"]["include"].push_back("THEORY_UF");
   for (const char* key : {"fun-sort-domain", "fun-sort-codomain"})
   {
     for (const char* sk :
-         {"SORT_FP", "SORT_RM", "SORT_ARRAY", "SORT_FUN", "SORT_UNINTERPRETED"})
+         {"SORT_ARRAY", "SORT_FUN", "SORT_UNINTERPRETED"})
     {
       profile["sorts"][key]["exclude"].push_back(sk);
     }
+#ifndef MURXLA_STP_HAVE_FP
+    /* Without symfpu there are no FP/RM sorts to put in a signature. When it
+     * is present they are admitted: a float position is compared by value, so
+     * every NaN is one argument while -0 and +0 stay distinct, and a
+     * RoundingMode position is pinned to the five modes its carrier encodes. */
+    for (const char* sk : {"SORT_FP", "SORT_RM"})
+    {
+      profile["sorts"][key]["exclude"].push_back(sk);
+    }
+#endif
   }
   /* THEORY_UF also registers SORT_UNINTERPRETED; STP has no uninterpreted
    * sorts, so drop it everywhere. */
@@ -1007,13 +1019,18 @@ StpSolver::mk_sort(SortKind kind, const std::vector<Sort>& sorts)
   {
     /* sorts is {domain_1, ..., domain_n, codomain}; STP requires arity >= 1
      * (a zero-arity function is an ordinary variable) and every domain and
-     * codomain sort to be Bool or a nonzero-width bit-vector. */
+     * codomain sort to be Bool, RoundingMode, FloatingPoint or a
+     * nonzero-width bit-vector. Arrays and function sorts are refused. */
     assert(sorts.size() >= 2);
     for (const Sort& s : sorts)
     {
-      MURXLA_CHECK_CONFIG(s->is_bool() || (s->is_bv() && s->get_bv_size() > 0))
+      bool ok = s->is_bool() || (s->is_bv() && s->get_bv_size() > 0);
+#ifdef MURXLA_STP_HAVE_FP
+      ok = ok || s->is_fp() || s->is_rm();
+#endif
+      MURXLA_CHECK_CONFIG(ok)
           << "STP uninterpreted-function domain and codomain sorts must be "
-             "Bool or a nonzero-width bit-vector";
+             "Bool, RoundingMode, FloatingPoint or a nonzero-width bit-vector";
     }
     std::vector<Sort> domain(sorts.begin(), sorts.end() - 1);
     return std::shared_ptr<StpSort>(new StpSort(domain, sorts.back()));
