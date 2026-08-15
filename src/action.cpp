@@ -2318,13 +2318,18 @@ ActionMkTerm::run(Op::Kind kind,
       }
     }
   }
+  /* UF taint (see --require-uf): a term uses UF iff it is an uninterpreted
+   * function application, or any operand does. */
+  bool uses_uf = (kind == Op::UF_APPLY);
   for (const Term& a : args)
   {
     uses_fp  = uses_fp || a->get_uses_fp();
     uses_ext = uses_ext || a->get_uses_ext();
+    uses_uf  = uses_uf || a->get_uses_uf();
   }
   res->set_uses_fp(uses_fp);
   res->set_uses_ext(uses_ext);
+  res->set_uses_uf(uses_uf);
 
   MURXLA_TRACE_RETURN << res << " " << res_sort;
   check_term(res);
@@ -2395,13 +2400,18 @@ ActionMkTerm::run(Op::Kind kind,
       }
     }
   }
+  /* UF taint (see --require-uf): a term uses UF iff it is an uninterpreted
+   * function application, or any operand does. */
+  bool uses_uf = (kind == Op::UF_APPLY);
   for (const Term& a : args)
   {
     uses_fp  = uses_fp || a->get_uses_fp();
     uses_ext = uses_ext || a->get_uses_ext();
+    uses_uf  = uses_uf || a->get_uses_uf();
   }
   res->set_uses_fp(uses_fp);
   res->set_uses_ext(uses_ext);
+  res->set_uses_uf(uses_uf);
 
   MURXLA_TRACE_RETURN << res << " " << res_sort;
   check_term(res);
@@ -2485,13 +2495,18 @@ ActionMkTerm::run(Op::Kind kind,
       }
     }
   }
+  /* UF taint (see --require-uf): a term uses UF iff it is an uninterpreted
+   * function application, or any operand does. */
+  bool uses_uf = (kind == Op::UF_APPLY);
   for (const Term& a : args)
   {
     uses_fp  = uses_fp || a->get_uses_fp();
     uses_ext = uses_ext || a->get_uses_ext();
+    uses_uf  = uses_uf || a->get_uses_uf();
   }
   res->set_uses_fp(uses_fp);
   res->set_uses_ext(uses_ext);
+  res->set_uses_uf(uses_uf);
 
   MURXLA_TRACE_RETURN << res << " " << res_sort;
   check_term(res);
@@ -3484,6 +3499,21 @@ ActionCheckSat::generate()
     }
     if (!relevant) return false;
   }
+  /* UF gate: never solve a formula without an uninterpreted-function
+   * application; the FSM keeps building until one appears. */
+  if (d_smgr.d_require_uf)
+  {
+    bool relevant = false;
+    for (const Term& a : d_smgr.assertions())
+    {
+      if (a->get_uses_uf())
+      {
+        relevant = true;
+        break;
+      }
+    }
+    if (!relevant) return false;
+  }
   run();
   return true;
 }
@@ -3543,6 +3573,32 @@ ActionCheckSatAssuming::generate()
       for (const Term& a : assumptions)
       {
         if (a->get_uses_fp() || a->get_uses_ext())
+        {
+          relevant = true;
+          break;
+        }
+      }
+    }
+    if (!relevant) return false;
+  }
+  /* UF gate: the solved formula is assertions + assumptions, so it qualifies
+   * if either contains an uninterpreted-function application. */
+  if (d_smgr.d_require_uf)
+  {
+    bool relevant = false;
+    for (const Term& a : d_smgr.assertions())
+    {
+      if (a->get_uses_uf())
+      {
+        relevant = true;
+        break;
+      }
+    }
+    if (!relevant)
+    {
+      for (const Term& a : assumptions)
+      {
+        if (a->get_uses_uf())
         {
           relevant = true;
           break;
@@ -3685,8 +3741,15 @@ ActionGetValue::generate()
   for (uint32_t i = 0; i < n_terms; ++i)
   {
     SortKind sort_kind = d_smgr.pick_sort_kind(0, d_exclude_sort_kinds);
-    terms.push_back(d_smgr.pick_term(sort_kind, 0));
+    Term t             = d_smgr.pick_term(sort_kind, 0);
+    /* The solver may be unable to report a value for this particular term
+     * (see Solver::can_get_value); skip it rather than asking. Sort kind is
+     * not a fine enough filter, e.g. an STP uninterpreted-function
+     * application has plain bit-vector sort. */
+    if (!d_solver.can_get_value(t)) continue;
+    terms.push_back(t);
   }
+  if (terms.empty()) return false;
   run(terms);
   return true;
 }

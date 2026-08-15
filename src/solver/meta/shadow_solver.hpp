@@ -229,6 +229,12 @@ class ShadowSolver : public Solver
 
   std::vector<Term> get_value(const std::vector<Term>& terms) override;
 
+  bool can_apply(const Op::Kind& kind,
+                 const std::vector<Term>& args,
+                 const std::vector<uint32_t>& indices) const override;
+
+  bool can_get_value(const Term& term) const override;
+
   void disable_unsupported_actions(FSM* fsm) const override;
 
  protected:

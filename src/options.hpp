@@ -131,6 +131,12 @@ struct Options
   bool require_fp_or_ext = false;
 
   /**
+   * Only run check-sat on formulas that contain at least one uninterpreted
+   * function application; skip everything else.
+   */
+  bool require_uf = false;
+
+  /**
    * Force incremental mode on for every run, regardless of what the solver
    * reports or what option fuzzing would pick, so push/pop, check-sat-assuming
    * and between-solve model reads are always exercised. Assumes the solver can

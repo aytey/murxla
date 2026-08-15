@@ -1130,10 +1130,15 @@ class AbsTerm
   bool get_uses_fp() const { return d_uses_fp; }
   /** @return True if this term uses array equality/distinct (see --require-fp-or-ext). */
   bool get_uses_ext() const { return d_uses_ext; }
+  /** @return True if an uninterpreted-function application appears anywhere in
+   *  this term (see --require-uf). */
+  bool get_uses_uf() const { return d_uses_uf; }
   /** Set the FP-usage taint bit (see --require-fp-or-ext). */
   void set_uses_fp(bool b) { d_uses_fp = b; }
   /** Set the extensionality-usage taint bit (see --require-fp-or-ext). */
   void set_uses_ext(bool b) { d_uses_ext = b; }
+  /** Set the UF-usage taint bit (see --require-uf). */
+  void set_uses_uf(bool b) { d_uses_uf = b; }
 
   /**
    * Cache special arguments for solver-spefic operators that need special
@@ -1162,6 +1167,12 @@ class AbsTerm
    */
   bool d_uses_fp  = false;
   bool d_uses_ext = false;
+  /**
+   * UF taint bit, computed as the term is built and read by the --require-uf
+   * check-sat gate: an uninterpreted-function application appears anywhere in
+   * this term's operands (or this term is one).
+   */
+  bool d_uses_uf = false;
   /**
    * The special value kind of this term..
    * SPECIAL_VALUE_NONE if this term is not a value or no special value.
@@ -1424,6 +1435,28 @@ class Solver
     (void) kind;
     (void) args;
     (void) indices;
+    return true;
+  }
+  /**
+   * Query whether the solver is able to report a model value for `term`.
+   *
+   * Some solvers can only evaluate a subset of the terms that exist in the
+   * term database after a satisfiable check-sat, and asking for anything else
+   * is fatal rather than recoverable (STP aborts the process when asked for
+   * the value of an uninterpreted-function application that the last certified
+   * solve did not reach). Returning false makes ActionGetValue pick a
+   * different term instead of aborting the run.
+   *
+   * This is a generation-time filter only; it is not consulted during replay,
+   * which is sound because the set of evaluable terms is a deterministic
+   * function of the calls that preceded it.
+   *
+   * @param term  The term whose model value would be queried.
+   * @return  True if get_value may be called with this term.
+   */
+  virtual bool can_get_value(const Term& term) const
+  {
+    (void) term;
     return true;
   }
   /**

@@ -27,6 +27,14 @@
 namespace murxla {
 namespace stp {
 
+#ifdef MURXLA_STP_HAVE_UF
+/** Swallow a diagnostic we asked for on purpose (see can_get_value). */
+static void
+ignore_diagnostic(const char*)
+{
+}
+#endif
+
 /* -------------------------------------------------------------------------- */
 /* StpSort                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -43,6 +51,14 @@ StpSort::hash() const
     res = res * 31 + d_index_sort->hash();
     res = res * 31 + d_element_sort->hash();
   }
+  else if (d_kind == SORT_FUN)
+  {
+    for (const Sort& s : d_fun_domain)
+    {
+      res = res * 31 + s->hash();
+    }
+    res = res * 31 + d_fun_codomain->hash();
+  }
   return res;
 }
 
@@ -58,6 +74,19 @@ StpSort::equals(const Sort& other) const
   {
     return d_index_sort->equals(stp_sort->d_index_sort)
            && d_element_sort->equals(stp_sort->d_element_sort);
+  }
+  if (d_kind == SORT_FUN)
+  {
+    if (d_fun_domain.size() != stp_sort->d_fun_domain.size()
+        || !d_fun_codomain->equals(stp_sort->d_fun_codomain))
+    {
+      return false;
+    }
+    for (size_t i = 0, n = d_fun_domain.size(); i < n; ++i)
+    {
+      if (!d_fun_domain[i]->equals(stp_sort->d_fun_domain[i])) return false;
+    }
+    return true;
   }
   return d_bv_size == stp_sort->d_bv_size && d_exp_size == stp_sort->d_exp_size
          && d_sig_size == stp_sort->d_sig_size;
@@ -82,6 +111,15 @@ StpSort::to_string() const
   {
     return "(_ FloatingPoint " + std::to_string(d_exp_size) + " "
            + std::to_string(d_sig_size) + ")";
+  }
+  if (d_kind == SORT_FUN)
+  {
+    std::string res = "(->";
+    for (const Sort& s : d_fun_domain)
+    {
+      res += " " + s->to_string();
+    }
+    return res + " " + d_fun_codomain->to_string() + ")";
   }
   assert(d_kind == SORT_ARRAY);
   return "(Array " + d_index_sort->to_string() + " " + d_element_sort->to_string()
@@ -110,6 +148,12 @@ bool
 StpSort::is_fp() const
 {
   return d_kind == SORT_FP;
+}
+
+bool
+StpSort::is_fun() const
+{
+  return d_kind == SORT_FUN;
 }
 
 bool
@@ -153,6 +197,27 @@ StpSort::get_array_element_sort() const
   return d_element_sort;
 }
 
+uint32_t
+StpSort::get_fun_arity() const
+{
+  assert(d_kind == SORT_FUN);
+  return static_cast<uint32_t>(d_fun_domain.size());
+}
+
+Sort
+StpSort::get_fun_codomain_sort() const
+{
+  assert(d_kind == SORT_FUN);
+  return d_fun_codomain;
+}
+
+std::vector<Sort>
+StpSort::get_fun_domain_sorts() const
+{
+  assert(d_kind == SORT_FUN);
+  return d_fun_domain;
+}
+
 /* -------------------------------------------------------------------------- */
 /* StpTerm                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -160,12 +225,21 @@ StpSort::get_array_element_sort() const
 Expr
 StpTerm::get_stp_term(Term term)
 {
-  return checked_cast<StpTerm*>(term.get())->d_term;
+  StpTerm* t = checked_cast<StpTerm*>(term.get());
+#ifdef MURXLA_STP_HAVE_UF
+  /* A function declaration is a UFDeclHandle, not an Expr; it must never
+   * reach an expression constructor. */
+  assert(!t->is_uf_decl());
+#endif
+  return t->d_term;
 }
 
 size_t
 StpTerm::hash() const
 {
+#ifdef MURXLA_STP_HAVE_UF
+  if (is_uf_decl()) return static_cast<size_t>(d_uf_decl);
+#endif
   return static_cast<size_t>(getExprID(d_term));
 }
 
@@ -175,6 +249,12 @@ StpTerm::equals(const Term& other) const
   StpTerm* stp_term = checked_cast<StpTerm*>(other.get());
   if (stp_term)
   {
+#ifdef MURXLA_STP_HAVE_UF
+    if (is_uf_decl() || stp_term->is_uf_decl())
+    {
+      return d_uf_decl == stp_term->d_uf_decl;
+    }
+#endif
     return getExprID(d_term) == getExprID(stp_term->d_term);
   }
   return false;
@@ -183,6 +263,12 @@ StpTerm::equals(const Term& other) const
 std::string
 StpTerm::to_string() const
 {
+#ifdef MURXLA_STP_HAVE_UF
+  if (is_uf_decl())
+  {
+    return "uf#" + std::to_string(d_uf_decl);
+  }
+#endif
   char* s = exprString(d_term);
   std::string res(s);
   free(s);
@@ -192,6 +278,9 @@ StpTerm::to_string() const
 bool
 StpTerm::is_bool_value() const
 {
+#ifdef MURXLA_STP_HAVE_UF
+  if (is_uf_decl()) return false;
+#endif
   enum exprkind_t kind = getExprKind(d_term);
   return kind == TRUE || kind == FALSE;
 }
@@ -199,6 +288,9 @@ StpTerm::is_bool_value() const
 bool
 StpTerm::is_bv_value() const
 {
+#ifdef MURXLA_STP_HAVE_UF
+  if (is_uf_decl()) return false;
+#endif
   return getExprKind(d_term) == BVCONST;
 }
 
@@ -223,6 +315,9 @@ StpTerm::is_special_value(const AbsTerm::SpecialValueKind& kind) const
    * equal cached term) and (b) correctly reports small-width aliasing, e.g. a
    * 2-bit ONE (01) is also MAX_SIGNED -- mirroring how the btor/bitwuzla
    * wrappers query the solver node. */
+#ifdef MURXLA_STP_HAVE_UF
+  if (is_uf_decl()) return false;
+#endif
   if (kind == AbsTerm::SPECIAL_VALUE_BV_ZERO
       || kind == AbsTerm::SPECIAL_VALUE_BV_ONE
       || kind == AbsTerm::SPECIAL_VALUE_BV_ONES
@@ -256,6 +351,10 @@ StpTerm::is_special_value(const AbsTerm::SpecialValueKind& kind) const
 bool
 StpTerm::is_const() const
 {
+#ifdef MURXLA_STP_HAVE_UF
+  /* A function declaration is an uninterpreted constant of function sort. */
+  if (is_uf_decl()) return true;
+#endif
   /* Derive leaf kind from STP's actual expression kind rather than Murxla's
    * leaf kind: STP hash-conses and constant-folds, so a term may be replaced
    * by an equal cached term whose Murxla leaf kind differs. A RoundingMode
@@ -272,6 +371,9 @@ StpTerm::is_value() const
    * value collides with an equal cached term (see is_const). Floating-point
    * values keep their leaf kind (FP operations never fold to a constant
    * floating-point node), so they are covered by the first disjunct. */
+#ifdef MURXLA_STP_HAVE_UF
+  if (is_uf_decl()) return false;
+#endif
   if (get_leaf_kind() == AbsTerm::LeafKind::VALUE)
   {
     return true;
@@ -310,6 +412,13 @@ StpSolver::new_solver()
    * term is created. */
   vc_setFlag(d_solver, 'x');
 #endif
+#ifdef MURXLA_STP_HAVE_UF
+  /* Enable uninterpreted functions (dynamic Ackermannization). Must be set
+   * before the first declaration; with the flag off, vc_declareUninterpreted-
+   * Function is a fatal error. Inert when nothing is declared -- the UF
+   * context is created lazily on the first declaration. */
+  vc_setFlag(d_solver, 'u');
+#endif
 }
 
 void
@@ -339,7 +448,8 @@ StpSolver::get_profile() const
   /* The embedded profile (profile.json) is the master-STP baseline. Adapt it
    * to the capabilities of the STP build we are linked against, detected at
    * configure time. */
-#if defined(MURXLA_STP_HAVE_FP) || defined(MURXLA_STP_HAVE_ARRAY_EX)
+#if defined(MURXLA_STP_HAVE_FP) || defined(MURXLA_STP_HAVE_ARRAY_EX) \
+    || defined(MURXLA_STP_HAVE_UF)
   auto profile = nlohmann::json::parse(s_profile);
 
 #ifdef MURXLA_STP_HAVE_FP
@@ -372,6 +482,36 @@ StpSolver::get_profile() const
     {
       sr.erase(op);
     }
+  }
+#endif
+
+#ifdef MURXLA_STP_HAVE_UF
+  /* This STP decides quantifier-free Bool/BV uninterpreted functions
+   * (--uninterpreted-functions). Enable THEORY_UF, but constrain it to what
+   * vc_declareUninterpretedFunction accepts: every domain and codomain sort
+   * must be Bool or a nonzero-width bit-vector. */
+  profile["theories"]["include"].push_back("THEORY_UF");
+  for (const char* key : {"fun-sort-domain", "fun-sort-codomain"})
+  {
+    for (const char* sk :
+         {"SORT_FP", "SORT_RM", "SORT_ARRAY", "SORT_FUN", "SORT_UNINTERPRETED"})
+    {
+      profile["sorts"][key]["exclude"].push_back(sk);
+    }
+  }
+  /* THEORY_UF also registers SORT_UNINTERPRETED; STP has no uninterpreted
+   * sorts, so drop it everywhere. */
+  profile["sorts"]["exclude"].push_back("SORT_UNINTERPRETED");
+  /* A function symbol has no model value of its own. */
+  profile["sorts"]["get-value"]["exclude"].push_back("SORT_FUN");
+  /* A declaration handle is not a term: it may only appear as the first
+   * operand of OP_UF_APPLY. STP has no way to build an if-then-else over two
+   * function symbols, nor to compare them, so keep the generator off those
+   * (this must come after the array-extensionality block above, which erases
+   * these keys wholesale). */
+  for (const char* op : {"OP_ITE", "OP_EQUAL", "OP_DISTINCT"})
+  {
+    profile["operators"]["sort-restrictions"][op].push_back("SORT_FUN");
   }
 #endif
 
@@ -556,6 +696,38 @@ StpSolver::mk_const(Sort sort, const std::string& name)
   {
     symbol = "_x" + std::to_string(d_num_symbols++);
   }
+#ifdef MURXLA_STP_HAVE_UF
+  if (sort->is_fun())
+  {
+    /* Declare an uninterpreted function. STP fatal-errors on a duplicate
+     * name, and the sanitisation above maps every non-alphanumeric character
+     * to '_', so distinct Murxla symbols collide readily -- suffix
+     * unconditionally to make the name unique within this context. */
+    symbol += "_uf" + std::to_string(d_num_symbols++);
+    std::vector<Sort> domain_sorts = sort->get_fun_domain_sorts();
+    std::vector<Type> domain;
+    for (const Sort& s : domain_sorts)
+    {
+      domain.push_back(get_stp_type(s));
+    }
+    assert(!domain.empty());
+    UFDeclHandle res = vc_declareUninterpretedFunction(
+        d_solver,
+        symbol.c_str(),
+        domain.data(),
+        domain.size(),
+        get_stp_type(sort->get_fun_codomain_sort()));
+    /* Validation failures are nonfatal and return zero; the generator only
+     * ever asks for signatures STP accepts, so a zero here is a wrapper bug
+     * worth reporting rather than ignoring. */
+    MURXLA_TEST(res != 0);
+    auto res_term = std::shared_ptr<StpTerm>(new StpTerm(res));
+    /* A declaration is an opaque identity carrying no sort information;
+     * record the Murxla sort so get_sort never has to recover it. */
+    res_term->set_sort(sort);
+    return res_term;
+  }
+#endif
 #ifdef MURXLA_STP_HAVE_FP
   if (sort->is_rm())
   {
@@ -830,6 +1002,23 @@ StpSolver::mk_sort(SortKind kind, uint32_t esize, uint32_t ssize)
 Sort
 StpSolver::mk_sort(SortKind kind, const std::vector<Sort>& sorts)
 {
+#ifdef MURXLA_STP_HAVE_UF
+  if (kind == SORT_FUN)
+  {
+    /* sorts is {domain_1, ..., domain_n, codomain}; STP requires arity >= 1
+     * (a zero-arity function is an ordinary variable) and every domain and
+     * codomain sort to be Bool or a nonzero-width bit-vector. */
+    assert(sorts.size() >= 2);
+    for (const Sort& s : sorts)
+    {
+      MURXLA_CHECK_CONFIG(s->is_bool() || (s->is_bv() && s->get_bv_size() > 0))
+          << "STP uninterpreted-function domain and codomain sorts must be "
+             "Bool or a nonzero-width bit-vector";
+    }
+    std::vector<Sort> domain(sorts.begin(), sorts.end() - 1);
+    return std::shared_ptr<StpSort>(new StpSort(domain, sorts.back()));
+  }
+#endif
   MURXLA_CHECK_CONFIG(kind == SORT_ARRAY)
       << "unsupported sort kind '" << kind
       << "' as argument to StpSolver::mk_sort, expected '" << SORT_ARRAY
@@ -1034,6 +1223,27 @@ StpSolver::mk_term(const Op::Kind& kind,
                    const std::vector<uint32_t>& indices,
                    const std::vector<std::string>& special_args)
 {
+#ifdef MURXLA_STP_HAVE_UF
+  if (kind == Op::UF_APPLY)
+  {
+    /* args[0] is the declaration (a UFDeclHandle, not an Expr, so it must be
+     * kept out of terms_to_stp_terms); args[1..] are the actuals. */
+    assert(args.size() >= 2);
+    StpTerm* decl = checked_cast<StpTerm*>(args[0].get());
+    assert(decl->is_uf_decl());
+    std::vector<Expr> actuals;
+    for (size_t i = 1, n = args.size(); i < n; ++i)
+    {
+      actuals.push_back(StpTerm::get_stp_term(args[i]));
+    }
+    Expr uf_res = vc_applyUninterpretedFunction(
+        d_solver, decl->get_uf_decl(), actuals.data(), actuals.size());
+    /* Arity/sort mismatches are nonfatal and return NULL; the generator only
+     * builds well-typed applications, so NULL means a wrapper bug. */
+    MURXLA_TEST(uf_res != nullptr);
+    return std::shared_ptr<StpTerm>(new StpTerm(uf_res));
+  }
+#endif
   std::vector<Expr> stp_args = terms_to_stp_terms(args);
   size_t n_args              = stp_args.size();
   Expr res                   = nullptr;
@@ -1410,10 +1620,55 @@ StpSolver::can_apply(const Op::Kind& kind,
   return true;
 }
 
+bool
+StpSolver::can_get_value(const Term& term) const
+{
+#ifdef MURXLA_STP_HAVE_UF
+  /* Only a *bare* uninterpreted-function application can lack a value: one
+   * the most recent certified solve never reached has none of its own, and
+   * that is not predictable from the assertions, because STP's simplifier
+   * drops applications under, e.g., a dead ite branch or a trivially true
+   * disjunction. A term built *over* an application is always evaluable --
+   * the enclosing operator needs a constant operand, so STP completes an
+   * unreached application through its certified function model.
+   *
+   * Ask STP rather than guess. The probe reports a nonfatal diagnostic when
+   * it declines, which is expected here and not worth printing, so silence
+   * the handler across the call only -- genuine diagnostics elsewhere still
+   * reach stderr. */
+  StpTerm* t = checked_cast<StpTerm*>(term.get());
+  assert(t);
+  if (!t->is_uf_decl() && getExprKind(StpTerm::get_stp_term(term)) == UF_APPLY)
+  {
+    vc_registerErrorHandler(ignore_diagnostic);
+    Expr value =
+        vc_getUninterpretedFunctionValue(d_solver, StpTerm::get_stp_term(term));
+    vc_registerErrorHandler(nullptr);
+    if (value == nullptr) return false;
+    vc_DeleteExpr(value);
+  }
+#else
+  (void) term;
+#endif
+  return true;
+}
+
 Sort
 StpSolver::get_sort(Term term, SortKind sort_kind)
 {
   Expr e = StpTerm::get_stp_term(term);
+#ifdef MURXLA_STP_HAVE_UF
+  /* A declaration handle is an ordinary STP symbol reserved as the function's
+   * identity and carries no function type, so the node cannot describe the
+   * signature. mk_const attaches the full Murxla sort at creation; hand that
+   * back rather than inspecting the node. */
+  if (sort_kind == SORT_FUN)
+  {
+    Sort s = term->get_sort();
+    assert(s != nullptr && s->is_fun());
+    return s;
+  }
+#endif
 #ifdef MURXLA_STP_HAVE_FP
   /* A RoundingMode term is represented as a 5-bit bit-vector in STP; the
    * requested sort kind is what disambiguates it from a genuine bit-vector. */
@@ -1517,6 +1772,10 @@ StpSolver::get_value(const std::vector<Term>& terms)
   for (const Term& t : terms)
   {
     Expr value = vc_getCounterExample(d_solver, StpTerm::get_stp_term(t));
+    /* Since the UFSTP v2 API, an unanswerable model query is nonfatal and
+     * yields NULL rather than aborting. can_get_value keeps UF-bearing terms
+     * away from here, so a NULL is a genuine failure to report. */
+    MURXLA_TEST(value != nullptr);
     res.push_back(std::shared_ptr<StpTerm>(new StpTerm(value)));
   }
   return res;

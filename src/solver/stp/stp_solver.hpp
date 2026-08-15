@@ -52,6 +52,16 @@ class StpSort : public AbsSort
       : d_kind(kind), d_exp_size(exp_size), d_sig_size(sig_size)
   {
   }
+  /**
+   * Construct a function sort with the given domain and codomain sorts. STP
+   * has no function type handle -- an uninterpreted function is declared by
+   * signature, not built from a sort -- so this is pure Murxla-side
+   * bookkeeping, consumed by StpSolver::mk_const.
+   */
+  StpSort(const std::vector<Sort>& domain, Sort codomain)
+      : d_kind(SORT_FUN), d_fun_domain(domain), d_fun_codomain(codomain)
+  {
+  }
   ~StpSort() override{};
 
   size_t hash() const override;
@@ -61,12 +71,16 @@ class StpSort : public AbsSort
   bool is_bool() const override;
   bool is_bv() const override;
   bool is_fp() const override;
+  bool is_fun() const override;
   bool is_rm() const override;
   uint32_t get_bv_size() const override;
   uint32_t get_fp_exp_size() const override;
   uint32_t get_fp_sig_size() const override;
   Sort get_array_index_sort() const override;
   Sort get_array_element_sort() const override;
+  uint32_t get_fun_arity() const override;
+  Sort get_fun_codomain_sort() const override;
+  std::vector<Sort> get_fun_domain_sorts() const override;
 
  private:
   /** The sort kind (SORT_BOOL, SORT_BV, SORT_ARRAY, SORT_FP or SORT_RM). */
@@ -81,6 +95,10 @@ class StpSort : public AbsSort
   uint32_t d_exp_size = 0;
   /** The significand bit-width, including the hidden bit (SORT_FP only). */
   uint32_t d_sig_size = 0;
+  /** The domain sorts (SORT_FUN only); each a Bool or bit-vector sort. */
+  std::vector<Sort> d_fun_domain;
+  /** The codomain sort (SORT_FUN only); a Bool or bit-vector sort. */
+  Sort d_fun_codomain;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -96,6 +114,19 @@ class StpTerm : public AbsTerm
   static Expr get_stp_term(Term term);
 
   StpTerm(Expr term) : d_term(term) {}
+#ifdef MURXLA_STP_HAVE_UF
+  /**
+   * Construct the term standing for an uninterpreted-function declaration.
+   * A declaration is a UFDeclHandle, an opaque integer identity -- not an
+   * Expr -- so such a term wraps no STP expression and may only be used as
+   * the first operand of Op::UF_APPLY.
+   */
+  StpTerm(UFDeclHandle uf_decl) : d_uf_decl(uf_decl) {}
+  /** True if this term is a function declaration rather than an expression. */
+  bool is_uf_decl() const { return d_uf_decl != 0; }
+  /** The declaration identity (only valid when is_uf_decl()). */
+  UFDeclHandle get_uf_decl() const { return d_uf_decl; }
+#endif
   ~StpTerm() override{};
 
   size_t hash() const override;
@@ -111,8 +142,12 @@ class StpTerm : public AbsTerm
   bool is_var() const override;
 
  private:
-  /** The wrapped STP expression. */
+  /** The wrapped STP expression (null for a function declaration). */
   Expr d_term = nullptr;
+#ifdef MURXLA_STP_HAVE_UF
+  /** The declaration identity; 0 unless this term is a UF declaration. */
+  UFDeclHandle d_uf_decl = 0;
+#endif
 };
 
 /* -------------------------------------------------------------------------- */
@@ -180,6 +215,8 @@ class StpSolver : public Solver
   bool can_apply(const Op::Kind& kind,
                  const std::vector<Term>& args,
                  const std::vector<uint32_t>& indices) const override;
+
+  bool can_get_value(const Term& term) const override;
 
   Sort get_sort(Term term, SortKind sort_kind) override;
 

@@ -840,6 +840,12 @@ class SolverManager
   bool d_require_fp_or_ext = false;
 
   /**
+   * True to only run check-sat on formulas that contain at least one
+   * uninterpreted-function application. Set from Options::require_uf.
+   */
+  bool d_require_uf = false;
+
+  /**
    * True to force incremental mode on for every run, so d_incremental is held
    * true regardless of what the solver reports or option fuzzing picks.
    * Set from Options::force_incremental.

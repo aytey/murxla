@@ -97,6 +97,8 @@ if (STP_FOUND)
     "stp/c_interface.h" STP_HAVE_FP_RMVAR)
   check_cxx_symbol_exists(vc_deleteCounterExampleArray
     "stp/c_interface.h" STP_HAVE_ARRAY_EX)
+  check_cxx_symbol_exists(vc_declareUninterpretedFunction
+    "stp/c_interface.h" STP_HAVE_UF)
   cmake_pop_check_state()
 
   # Incremental solving added no new C-API symbol, so detect it by the presence
@@ -119,6 +121,10 @@ if (STP_FOUND)
   if (STP_HAVE_INCREMENTAL)
     target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_INCREMENTAL)
     message(STATUS "STP: incremental-solving support detected")
+  endif()
+  if (STP_HAVE_UF)
+    target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_UF)
+    message(STATUS "STP: uninterpreted-function support detected")
   endif()
 endif()
 

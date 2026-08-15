@@ -1252,6 +1252,30 @@ ShadowSolver::get_value(const std::vector<Term>& terms)
   return res;
 }
 
+bool
+ShadowSolver::can_apply(const Op::Kind& kind,
+                        const std::vector<Term>& args,
+                        const std::vector<uint32_t>& indices) const
+{
+  /* Both solvers must accept the instance: without this forwarding the base
+   * implementation would answer 'true' unconditionally and silently bypass
+   * every wrapped solver's generation-time filter whenever cross-checking is
+   * enabled. */
+  std::vector<Term> args_orig, args_shadow;
+  get_terms_helper(args, args_orig, args_shadow);
+  return d_solver->can_apply(kind, args_orig, indices)
+         && d_solver_shadow->can_apply(kind, args_shadow, indices);
+}
+
+bool
+ShadowSolver::can_get_value(const Term& term) const
+{
+  ShadowTerm* t = checked_cast<ShadowTerm*>(term.get());
+  assert(t);
+  return d_solver->can_get_value(t->get_term())
+         && d_solver_shadow->can_get_value(t->get_term_shadow());
+}
+
 void
 ShadowSolver::disable_unsupported_actions(FSM* fsm) const
 {
