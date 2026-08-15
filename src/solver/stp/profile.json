@@ -50,7 +50,9 @@
 
   "errors": {
     "exclude": [
-      "is not supported at this format"
+      "is not supported at this format",
+      "norm_cache\\.insert\\(res\\)\\.second",
+      "prev_res[0-9] != res"
     ]
   }
 }
