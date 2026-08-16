@@ -555,6 +555,17 @@ SolverManager::pick_op_kind(bool with_terms, SortKind sort_kind)
       }
 
       Theory theory = THEORY_ALL;
+      /* Under --require-uf, THEORY_UF is the only theory whose terms move a
+       * run towards a solve, and it contributes exactly one operator against
+       * every other theory's many. Pick it half the time when it is available
+       * at all; the other half still builds the arguments and the Boolean
+       * structure an application has to sit inside. */
+      if (d_require_uf && kinds.find(THEORY_UF) != kinds.end()
+          && d_rng.pick_with_prob(500))
+      {
+        auto& uf_kinds = kinds[THEORY_UF];
+        return d_rng.pick_from_set<decltype(uf_kinds), Op::Kind>(uf_kinds);
+      }
       if (kinds.size() > min_size && d_rng.pick_with_prob(prob))
       {
         do

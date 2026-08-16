@@ -1591,6 +1591,28 @@ ActionMkTerm::generate(Op::Kind kind)
       assert(fun_sort->is_fun());
       assert(d_smgr.has_term(fun_sort));
 
+      /* An application needs a term of every declared domain sort, and one
+       * picked function's signature may name a sort nothing has been built at
+       * yet -- much more likely once parameterised sorts such as
+       * floating-point can appear in a signature, since each format is its own
+       * sort. Giving up here abandons the whole mk-term action, so look for a
+       * function that can actually be applied before doing so. */
+      for (uint32_t i = 0; i < 8; ++i)
+      {
+        bool applicable = true;
+        const auto& candidate = fun_sort->get_sorts();
+        for (auto it = candidate.begin(); it < candidate.end() - 1; ++it)
+        {
+          if (!d_smgr.has_term(*it))
+          {
+            applicable = false;
+            break;
+          }
+        }
+        if (applicable) break;
+        fun_sort = d_smgr.pick_sort(op.get_arg_sort_kind(0));
+      }
+
       args.push_back(d_smgr.pick_term(fun_sort));
 
       const auto& sorts = fun_sort->get_sorts();
@@ -2767,6 +2789,16 @@ ActionMkConst::generate()
     exclude.insert(SORT_FUN);
   }
   if (!d_smgr.has_sort_excluding(exclude, false)) return false;
+  /* Under --require-uf nothing can be solved until a function has been
+   * declared, and every other sort competes for this action. Declare one as
+   * soon as a function sort exists and none has been declared yet; after that
+   * fall back to the ordinary uniform pick, so the run still builds the
+   * arguments and Boolean structure an application needs. */
+  if (d_smgr.d_require_uf && !d_smgr.has_term(SORT_FUN)
+      && d_smgr.has_sort(SORT_FUN))
+  {
+    return generate(d_smgr.pick_sort(SORT_FUN, false));
+  }
   Sort sort = d_smgr.pick_sort_excluding(exclude, false);
   return generate(sort);
 }
@@ -3441,6 +3473,18 @@ ActionAssertFormula::generate()
   assert(d_solver.is_initialized());
   if (!d_smgr.has_term(SORT_BOOL, 0)) return false;
   Term assertion = d_smgr.pick_term(SORT_BOOL, 0);
+
+  /* Under --require-uf a check-sat is only issued once some assertion carries
+   * an uninterpreted-function application, so an assertion that carries none
+   * moves the run no closer to a solve. Retry a few times for one that does
+   * before settling for what was picked. */
+  if (d_smgr.d_require_uf && !assertion->get_uses_uf())
+  {
+    for (uint32_t i = 0; i < 8 && !assertion->get_uses_uf(); ++i)
+    {
+      assertion = d_smgr.pick_term(SORT_BOOL, 0);
+    }
+  }
 
   run(assertion);
   return true;
