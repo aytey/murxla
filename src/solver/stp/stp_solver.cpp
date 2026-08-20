@@ -607,11 +607,11 @@ StpSolver::configure_options(SolverManager* smgr)
   smgr->add_option(new SolverOptionBool(OPT_UF_NARROW_RESULTS, true));
   smgr->add_option(new SolverOptionBool(OPT_UF_INJECT_ARGS, true));
   smgr->add_option(new SolverOptionNum<uint32_t>(
-      OPT_BV_EQ_ABSTRACTION_WIDTH, 1, MURXLA_BW_MAX, 1));
+      OPT_BV_EQ_ABSTRACTION_WIDTH, 1, smgr->d_bw_max, 1));
   /* 0 refines an inconsistent equality over its whole width at once; any
    * other value starts at that prefix and doubles per refinement. */
   smgr->add_option(new SolverOptionNum<uint32_t>(
-      OPT_BV_EQ_REFINE_WIDTH, 0, MURXLA_BW_MAX, 1));
+      OPT_BV_EQ_REFINE_WIDTH, 0, smgr->d_bw_max, 1));
 #endif
 #ifdef MURXLA_STP_HAVE_REFINEMENT_OPTS
   smgr->add_option(new SolverOptionBool(OPT_BV_TERM_ABSTRACTION_MULT, true));

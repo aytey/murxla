@@ -16,6 +16,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "config.hpp"
 #include "solver/solver.hpp"
 #include "solver/solver_profile.hpp"
 #include "solver_option.hpp"
@@ -846,11 +847,31 @@ class SolverManager
   bool d_require_uf = false;
 
   /**
+   * True to steer generation towards uninterpreted functions, which
+   * d_require_uf also does, without gating check-sat on one. Set from
+   * Options::prefer_uf; d_require_uf implies it.
+   */
+  bool d_prefer_uf = false;
+
+  /**
    * True to force incremental mode on for every run, so d_incremental is held
    * true regardless of what the solver reports or option fuzzing picks.
    * Set from Options::force_incremental.
    */
   bool d_force_incremental = false;
+
+  /**
+   * True to give every registered solver option a random value at the start
+   * of every run. Set from Options::fuzz_options_all.
+   */
+  bool d_fuzz_options_all = false;
+
+  /**
+   * The widest bit-vector sort generation may build. Set from Options::bw_max,
+   * and never above MURXLA_BW_MAX, which the term database still asserts and
+   * which sizes a std::bitset in the Boolector wrapper.
+   */
+  uint32_t d_bw_max = MURXLA_BW_MAX;
 
   /**
    * True if all symbols for terms should be of the form '_sX' rather than

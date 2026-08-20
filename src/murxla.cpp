@@ -957,7 +957,11 @@ Murxla::run_aux(uint64_t seed,
           rng, sng, trace, smt2_out, record_stats, !untrace_file_name.empty());
       fsm.get_smgr().d_require_fp_or_ext = d_options.require_fp_or_ext;
       fsm.get_smgr().d_require_uf        = d_options.require_uf;
+      fsm.get_smgr().d_prefer_uf =
+          d_options.prefer_uf || d_options.require_uf;
       fsm.get_smgr().d_force_incremental = d_options.force_incremental;
+      fsm.get_smgr().d_fuzz_options_all  = d_options.fuzz_options_all;
+      fsm.get_smgr().d_bw_max            = d_options.bw_max;
 
       fsm.configure();
 

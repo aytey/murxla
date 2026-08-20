@@ -494,6 +494,29 @@ ActionSetOptionReq::generate()
   {
     d_setoption->run(name, value);
   }
+  /* Under --fuzz-opts-all, every remaining registered option gets a random
+   * value here rather than waiting for ActionSetOption to reach it. A run
+   * takes only a handful of set-option actions, so most options would
+   * otherwise sit at the wrapper's default -- and a defect that needs two of
+   * them at once is then out of reach. The options pinned with -o were just
+   * marked used above, so they keep the value they were pinned to. Sorted, so
+   * that a seed picks the same values whatever order the map iterates in. */
+  if (d_smgr.d_fuzz_options_all)
+  {
+    const auto& options = d_smgr.solver_options();
+    std::vector<std::string> names;
+    names.reserve(options.size());
+    for (const auto& [name, option] : options)
+    {
+      names.push_back(name);
+    }
+    std::sort(names.begin(), names.end());
+    for (const auto& name : names)
+    {
+      if (d_smgr.is_option_used(name)) continue;
+      d_setoption->run(name, options.at(name)->pick_value(d_rng));
+    }
+  }
   return true;
 }
 
@@ -584,7 +607,7 @@ ActionMkSort::generate()
     break;
 
     case SORT_BV:
-      run(kind, d_rng.pick<uint32_t>(MURXLA_BW_MIN, MURXLA_BW_MAX));
+      run(kind, d_rng.pick<uint32_t>(MURXLA_BW_MIN, d_smgr.d_bw_max));
       break;
 
     case SORT_DT:
@@ -1441,9 +1464,9 @@ ActionMkTerm::generate(Op::Kind kind)
     if (kind == Op::BV_CONCAT)
     {
       assert(!n_indices);
-      if (!d_smgr.has_sort_bv_max(MURXLA_BW_MAX - 1)) return false;
-      Sort sort   = d_smgr.pick_sort_bv_max(MURXLA_BW_MAX - 1);
-      uint32_t bw = MURXLA_BW_MAX - sort->get_bv_size();
+      if (!d_smgr.has_sort_bv_max(d_smgr.d_bw_max - 1)) return false;
+      Sort sort   = d_smgr.pick_sort_bv_max(d_smgr.d_bw_max - 1);
+      uint32_t bw = d_smgr.d_bw_max - sort->get_bv_size();
       if (!d_smgr.has_sort_bv_max(bw)) return false;
       args.push_back(d_smgr.pick_term(sort));
       do
@@ -1819,7 +1842,7 @@ ActionMkTerm::generate(Op::Kind kind)
           assert(sort_kind == SORT_BV);
           uint32_t bw = args[0]->get_sort()->get_bv_size();
           indices.push_back(d_rng.pick<uint32_t>(
-              1, std::max<uint32_t>(1, MURXLA_BW_MAX / bw)));
+              1, std::max<uint32_t>(1, d_smgr.d_bw_max / bw)));
         }
         else if (kind == Op::BV_ROTATE_LEFT || kind == Op::BV_ROTATE_RIGHT)
         {
@@ -1837,7 +1860,8 @@ ActionMkTerm::generate(Op::Kind kind)
           assert(args[0]->get_sort()->is_bv());
           assert(sort_kind == SORT_BV);
           uint32_t bw = args[0]->get_sort()->get_bv_size();
-          indices.push_back(d_rng.pick<uint32_t>(0, MURXLA_BW_MAX - bw));
+          indices.push_back(d_rng.pick<uint32_t>(
+              0, d_smgr.d_bw_max > bw ? d_smgr.d_bw_max - bw : 0));
         }
         else if (kind == Op::FP_TO_FP_FROM_SBV || kind == Op::FP_TO_FP_FROM_UBV)
         {
@@ -1874,7 +1898,7 @@ ActionMkTerm::generate(Op::Kind kind)
           assert(sort_kind == SORT_BV);
           /* term has BV sort, pick bit-width */
           indices.push_back(
-              d_rng.pick<uint32_t>(1, std::max<uint32_t>(1, MURXLA_BW_MAX)));
+              d_rng.pick<uint32_t>(1, std::max<uint32_t>(1, d_smgr.d_bw_max)));
         }
         else if (kind == Op::FP_TO_FP_FROM_REAL)
         {
@@ -1903,7 +1927,7 @@ ActionMkTerm::generate(Op::Kind kind)
           assert(args.size() == 1);
           assert(args[0]->get_sort()->is_int());
           assert(sort_kind == SORT_BV);
-          indices.push_back(d_rng.pick<uint32_t>(1, MURXLA_BW_MAX));
+          indices.push_back(d_rng.pick<uint32_t>(1, d_smgr.d_bw_max));
         }
         else if (kind == Op::RE_LOOP)
         {
@@ -2794,7 +2818,7 @@ ActionMkConst::generate()
    * soon as a function sort exists and none has been declared yet; after that
    * fall back to the ordinary uniform pick, so the run still builds the
    * arguments and Boolean structure an application needs. */
-  if (d_smgr.d_require_uf && !d_smgr.has_term(SORT_FUN)
+  if (d_smgr.d_prefer_uf && !d_smgr.has_term(SORT_FUN)
       && d_smgr.has_sort(SORT_FUN))
   {
     return generate(d_smgr.pick_sort(SORT_FUN, false));
@@ -3478,7 +3502,7 @@ ActionAssertFormula::generate()
    * an uninterpreted-function application, so an assertion that carries none
    * moves the run no closer to a solve. Retry a few times for one that does
    * before settling for what was picked. */
-  if (d_smgr.d_require_uf && !assertion->get_uses_uf())
+  if (d_smgr.d_prefer_uf && !assertion->get_uses_uf())
   {
     for (uint32_t i = 0; i < 8 && !assertion->get_uses_uf(); ++i)
     {

@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
+#include "config.hpp"
 #include "theory.hpp"
 
 namespace murxla {
@@ -135,6 +136,11 @@ struct Options
    * function application; skip everything else.
    */
   bool require_uf = false;
+  /**
+   * True to steer generation towards uninterpreted functions without gating
+   * check-sat on one, which --require-uf also does. See --prefer-uf.
+   */
+  bool prefer_uf = false;
 
   /**
    * Force incremental mode on for every run, regardless of what the solver
@@ -143,6 +149,17 @@ struct Options
    * solve incrementally.
    */
   bool force_incremental = false;
+  /**
+   * True to give every registered solver option a random value at the start
+   * of every run, rather than leaving it to the handful of set-option actions
+   * the FSM happens to take. See --fuzz-opts-all.
+   */
+  bool fuzz_options_all = false;
+  /**
+   * The widest bit-vector sort generation may build, capped at
+   * MURXLA_BW_MAX. See --bw-max.
+   */
+  uint32_t bw_max = MURXLA_BW_MAX;
 };
 }  // namespace murxla
 #endif

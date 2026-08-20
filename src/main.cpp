@@ -289,6 +289,9 @@ set_sigint_handler_stats(void)
   "                             wildcards, which are matched against option\n" \
   "                             names. use ^ to indicate a wildcard must\n"    \
   "                             match the beginning of an option name\n"       \
+  "  --fuzz-opts-all            give every option that survives --fuzz-opts\n" \
+  "                             a random value on every run, instead of the\n" \
+  "                             few the FSM happens to reach\n"                \
   "  -c, --cross-check <solver> cross check with <solver> (SMT-LIB only)\n"    \
   "  --cross-check-opts name=value,...\n"                                      \
   "                             options for cross check solver\n"              \
@@ -296,11 +299,14 @@ set_sigint_handler_stats(void)
   "                             model values with <solver>\n"                  \
   "  --require-fp-or-ext        only check-sat formulas that use FP/RM\n"       \
   "                             anywhere or array equality/distinct\n"          \
+  "  --prefer-uf                steer generation towards uninterpreted\n"       \
+  "                             functions without gating check-sat on one\n"    \
   "  --require-uf               only check-sat formulas that contain at\n"      \
   "                             least one uninterpreted function\n"             \
   "                             application\n"                                  \
   "  --force-incremental        force incremental mode on every run\n"          \
   "                             (always exercise push/pop, assumptions)\n"      \
+  "  --bw-max <int>             widest bit-vector sort to generate\n"           \
   "\n"                                                                         \
   " Enable/disable theories:\n"                                                \
   "  --[no-]arrays                theory of arrays\n"                          \
@@ -523,6 +529,10 @@ parse_options(Options& options, int argc, char* argv[])
       record_args.push_back(arg);
       options.require_fp_or_ext = true;
     }
+    else if (arg == "--prefer-uf")
+    {
+      options.prefer_uf = true;
+    }
     else if (arg == "--require-uf")
     {
       record_args.push_back(arg);
@@ -676,6 +686,20 @@ parse_options(Options& options, int argc, char* argv[])
     else if (arg == "-l" || arg == "--smt-lib")
     {
       options.smtlib_compliant = true;
+    }
+    else if (arg == "--bw-max")
+    {
+      check_next_arg(arg, ++i, size);
+      uint32_t bw_max = str_to_uint32(args[i]);
+      MURXLA_EXIT_ERROR(bw_max < MURXLA_BW_MIN || bw_max > MURXLA_BW_MAX)
+          << "invalid argument to option '" << arg << "', expected a value in ["
+          << MURXLA_BW_MIN << ", " << MURXLA_BW_MAX << "]";
+      options.bw_max = bw_max;
+    }
+    else if (arg == "--fuzz-opts-all")
+    {
+      options.fuzz_options     = true;
+      options.fuzz_options_all = true;
     }
     else if (arg == "--fuzz-opts")
     {

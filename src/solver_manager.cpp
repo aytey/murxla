@@ -560,7 +560,7 @@ SolverManager::pick_op_kind(bool with_terms, SortKind sort_kind)
        * every other theory's many. Pick it half the time when it is available
        * at all; the other half still builds the arguments and the Boolean
        * structure an application has to sit inside. */
-      if (d_require_uf && kinds.find(THEORY_UF) != kinds.end()
+      if (d_prefer_uf && kinds.find(THEORY_UF) != kinds.end()
           && d_rng.pick_with_prob(500))
       {
         auto& uf_kinds = kinds[THEORY_UF];
