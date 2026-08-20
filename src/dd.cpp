@@ -999,7 +999,7 @@ DD::test(Result golden_exit,
       && (d_murxla->d_options.dd_ignore_out
           || (!d_murxla->d_options.dd_match_out.empty()
               && find_in_file(
-                  tmp_err_file_name, d_murxla->d_options.dd_match_out, false))
+                  tmp_out_file_name, d_murxla->d_options.dd_match_out, false))
           || compare_files(tmp_out_file_name, d_gold_out_file_name))
       && (d_murxla->d_options.dd_ignore_err
           || (!d_murxla->d_options.dd_match_err.empty()
