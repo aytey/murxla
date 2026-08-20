@@ -99,6 +99,29 @@ if (STP_FOUND)
     "stp/c_interface.h" STP_HAVE_ARRAY_EX)
   check_cxx_symbol_exists(vc_declareUninterpretedFunction
     "stp/c_interface.h" STP_HAVE_UF)
+  # The CEGAR abstraction and UF encoding knobs are enumerators of
+  # ifaceflag_t, not symbols, so they need a compile test rather than a symbol
+  # check. BV_EQ_ABSTRACTION stands for the first group of six, which arrived
+  # together; vc_setInterfaceFlags fatally rejects any flag it does not know,
+  # so each group a build may or may not have needs its own test.
+  include(CheckCXXSourceCompiles)
+  check_cxx_source_compiles("
+    #include <stp/c_interface.h>
+    int main() { return (int) BV_EQ_ABSTRACTION; }"
+    STP_HAVE_ABSTRACTION_OPTS)
+  # The second group: the term-abstraction sub-knobs plus the UF refinement,
+  # distinct-ordering and AIG-budget flags that until then only the command
+  # line could reach. BV_TERM_ABSTRACTION_ROUNDS stands for it -- it is the
+  # last enumerator added, so a build that has it has all of them.
+  check_cxx_source_compiles("
+    #include <stp/c_interface.h>
+    int main() { return (int) BV_TERM_ABSTRACTION_ROUNDS; }"
+    STP_HAVE_REFINEMENT_OPTS)
+  # Why the last query had no answer. A separate check from the flags above:
+  # this is a symbol, and a build could in principle have one without the
+  # other.
+  check_cxx_symbol_exists(vc_getReasonUnknown
+    "stp/c_interface.h" STP_HAVE_REASON_UNKNOWN)
   cmake_pop_check_state()
 
   # Incremental solving added no new C-API symbol, so detect it by the presence
@@ -125,6 +148,18 @@ if (STP_FOUND)
   if (STP_HAVE_UF)
     target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_UF)
     message(STATUS "STP: uninterpreted-function support detected")
+  endif()
+  if (STP_HAVE_ABSTRACTION_OPTS)
+    target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_ABSTRACTION_OPTS)
+    message(STATUS "STP: CEGAR abstraction options detected")
+  endif()
+  if (STP_HAVE_REFINEMENT_OPTS)
+    target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_REFINEMENT_OPTS)
+    message(STATUS "STP: extended refinement options detected")
+  endif()
+  if (STP_HAVE_REASON_UNKNOWN)
+    target_compile_definitions(murxla PUBLIC MURXLA_STP_HAVE_REASON_UNKNOWN)
+    message(STATUS "STP: reason-unknown reporting detected")
   endif()
 endif()
 

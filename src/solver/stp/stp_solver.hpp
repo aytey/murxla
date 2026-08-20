@@ -165,6 +165,45 @@ class StpSolver : public Solver
   inline static const Op::Kind OP_UMULO = "stp-OP_UMULO";
   inline static const Op::Kind OP_SMULO = "stp-OP_SMULO";
 
+#ifdef MURXLA_STP_HAVE_ABSTRACTION_OPTS
+  /**
+   * The names of STP's CEGAR abstraction and UF encoding options, spelled as
+   * the STP command line spells them. They are set through vc_setInterface-
+   * Flags rather than the SMT-LIB option namespace, so these names exist only
+   * here and in -o / --fuzz-opts.
+   */
+  inline static const std::string OPT_BV_EQ_ABSTRACTION = "bv-eq-abstraction";
+  inline static const std::string OPT_BV_EQ_ABSTRACTION_WIDTH =
+      "bv-eq-abstraction-width";
+  inline static const std::string OPT_BV_EQ_REFINE_WIDTH =
+      "bv-eq-refine-width";
+  inline static const std::string OPT_BV_TERM_ABSTRACTION =
+      "bv-term-abstraction";
+  inline static const std::string OPT_UF_NARROW_RESULTS = "uf-narrow-results";
+  inline static const std::string OPT_UF_INJECT_ARGS = "uf-inject-args";
+#endif
+
+#ifdef MURXLA_STP_HAVE_REFINEMENT_OPTS
+  /**
+   * The rest of the refinement knobs, spelled as the STP command line spells
+   * them. Same namespace and the same -o / --fuzz-opts reach as the group
+   * above; they are separate only because a build may have the first group
+   * without this one.
+   */
+  inline static const std::string OPT_BV_TERM_ABSTRACTION_MULT =
+      "bv-term-abstraction-mult";
+  inline static const std::string OPT_BV_TERM_ABSTRACTION_ROUNDS =
+      "bv-term-abstraction-rounds";
+  inline static const std::string OPT_UF_LEMMAS_PER_ROUND =
+      "uf-lemmas-per-round";
+  inline static const std::string OPT_UF_ACKERMANN = "uf-ackermann";
+  inline static const std::string OPT_UF_ACKERMANN_BUDGET =
+      "uf-ackermann-budget";
+  inline static const std::string OPT_UF_PHASE_HINTS = "uf-phase-hints";
+  inline static const std::string OPT_DISTINCT_ORDERING = "distinct-ordering";
+  inline static const std::string OPT_AIG_NODE_BUDGET = "aig-node-budget";
+#endif
+
   StpSolver(SolverSeedGenerator& sng) : Solver(sng), d_solver(nullptr) {}
   ~StpSolver() override;
 
@@ -175,6 +214,7 @@ class StpSolver : public Solver
   const std::string get_profile() const override;
 
   void configure_opmgr(OpKindManager* opmgr) const override;
+  void configure_options(SolverManager* smgr) override;
   void disable_unsupported_actions(FSM* fsm) const override;
 
   bool is_unsat_assumption(const Term& t) const override;
@@ -240,6 +280,19 @@ class StpSolver : public Solver
   void set_opt(const std::string& opt, const std::string& value) override;
 
  private:
+#ifdef MURXLA_STP_HAVE_ABSTRACTION_OPTS
+  /**
+   * Push the current abstraction/UF encoding settings into the checker. The
+   * settings live here rather than only in STP because reset() builds a fresh
+   * checker, and a fresh checker starts from STP's own defaults again.
+   */
+  void apply_abstraction_opts() const;
+#endif
+  /**
+   * Map an STP query result onto a murxla result, testing what the C API
+   * promises about the values it may take.
+   */
+  Result to_result(int32_t res) const;
   /** Reconstruct the STP type handle for the given murxla sort. */
   Type get_stp_type(Sort sort) const;
   /** Convert a vector of murxla terms to STP expressions. */
@@ -279,6 +332,56 @@ class StpSolver : public Solver
   bool d_pending_assumption_pop = false;
   /** Counter for generating unique symbol names. */
   uint64_t d_num_symbols = 0;
+
+#ifdef MURXLA_STP_HAVE_ABSTRACTION_OPTS
+  /**
+   * STP's CEGAR abstraction and UF encoding settings, all on by default. The
+   * two widths are set low enough that the abstractions actually engage on
+   * the small bit-vectors murxla generates -- STP's own defaults abstract
+   * nothing below 64 bits, which would leave these paths untested. Override
+   * per run with -o, or sweep them with --fuzz-opts.
+   *
+   * uf-inject-args is on with the rest. It used to be off because it was an
+   * under-approximation that could answer unsat for a satisfiable query, so
+   * every non-injective UF was a false cross-check alarm; STP now installs
+   * the injectivity assumption retractably and takes back a refutation that
+   * rested on it, which makes the flag verdict-preserving and so exactly the
+   * thing a cross-checked run should be exercising. Against a build that
+   * predates that, pin it off with -o uf-inject-args=0.
+   */
+  bool d_bv_eq_abstraction              = true;
+  bool d_bv_term_abstraction            = true;
+  bool d_uf_narrow_results              = true;
+  bool d_uf_inject_args                 = true;
+  uint32_t d_bv_eq_abstraction_width    = 1;
+  uint32_t d_bv_eq_refine_width         = 1;
+#endif
+
+#ifdef MURXLA_STP_HAVE_REFINEMENT_OPTS
+  /**
+   * The rest of the refinement knobs, at STP's own defaults except
+   * bv-term-abstraction-rounds -- for the same reason the widths above are
+   * lowered. That count is how many operand pairs an abstracted
+   * BVMULT/BVDIV/BVMOD may be blocked on before its refinement gives up
+   * enumerating and encodes the operation exactly; on bit-vectors this small
+   * STP's default of 32 is rarely reached, so the escalation would go
+   * untested. Four reaches it routinely, and 0 (never escalate) stays in the
+   * swept range.
+   *
+   * aig-node-budget is 0, i.e. unlimited, because a budget that bites answers
+   * unknown -- which is sound, and which the cross-checker can do nothing
+   * with. It is registered so a run can ask for it deliberately.
+   */
+  bool d_bv_term_abstraction_mult       = true;
+  uint32_t d_bv_term_abstraction_rounds = 4;
+  uint32_t d_uf_lemmas_per_round        = 8;
+  /** 0: auto (the default), 1: on, 2: off -- STP's own encoding. */
+  uint32_t d_uf_ackermann               = 0;
+  uint32_t d_uf_ackermann_budget        = 256;
+  bool d_uf_phase_hints                 = false;
+  bool d_distinct_ordering              = true;
+  uint32_t d_aig_node_budget            = 0;
+#endif
 };
 
 }  // namespace stp

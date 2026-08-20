@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 #include <unordered_set>
 
 #include <nlohmann/json.hpp>
@@ -419,7 +420,52 @@ StpSolver::new_solver()
    * context is created lazily on the first declaration. */
   vc_setFlag(d_solver, 'u');
 #endif
+#ifdef MURXLA_STP_HAVE_ABSTRACTION_OPTS
+  apply_abstraction_opts();
+#endif
 }
+
+#ifdef MURXLA_STP_HAVE_ABSTRACTION_OPTS
+void
+StpSolver::apply_abstraction_opts() const
+{
+  assert(d_solver != nullptr);
+  /* Read at various points of a solve -- while the query is bit-blasted, or
+   * while its UF applications are lowered, and on older builds when a
+   * declaration is registered -- so they are set here, before any term
+   * exists, which is ahead of all of them. */
+  vc_setInterfaceFlags(d_solver, BV_EQ_ABSTRACTION, d_bv_eq_abstraction);
+  vc_setInterfaceFlags(d_solver, BV_TERM_ABSTRACTION, d_bv_term_abstraction);
+  vc_setInterfaceFlags(d_solver,
+                       BV_EQ_ABSTRACTION_WIDTH,
+                       static_cast<int32_t>(d_bv_eq_abstraction_width));
+  vc_setInterfaceFlags(d_solver,
+                       BV_EQ_REFINE_WIDTH,
+                       static_cast<int32_t>(d_bv_eq_refine_width));
+  vc_setInterfaceFlags(d_solver, UF_NARROW_RESULTS, d_uf_narrow_results);
+  vc_setInterfaceFlags(
+      d_solver, UF_EQUALITY_INJECTIVITY, d_uf_inject_args);
+#ifdef MURXLA_STP_HAVE_REFINEMENT_OPTS
+  vc_setInterfaceFlags(
+      d_solver, BV_TERM_ABSTRACTION_MULT, d_bv_term_abstraction_mult);
+  vc_setInterfaceFlags(d_solver,
+                       BV_TERM_ABSTRACTION_ROUNDS,
+                       static_cast<int32_t>(d_bv_term_abstraction_rounds));
+  vc_setInterfaceFlags(d_solver,
+                       UF_LEMMAS_PER_ROUND,
+                       static_cast<int32_t>(d_uf_lemmas_per_round));
+  vc_setInterfaceFlags(
+      d_solver, UF_ACKERMANN, static_cast<int32_t>(d_uf_ackermann));
+  vc_setInterfaceFlags(d_solver,
+                       UF_ACKERMANN_BUDGET,
+                       static_cast<int32_t>(d_uf_ackermann_budget));
+  vc_setInterfaceFlags(d_solver, UF_PHASE_HINTS, d_uf_phase_hints);
+  vc_setInterfaceFlags(d_solver, DISTINCT_ORDERING, d_distinct_ordering);
+  vc_setInterfaceFlags(
+      d_solver, AIG_NODE_BUDGET, static_cast<int32_t>(d_aig_node_budget));
+#endif
+}
+#endif
 
 void
 StpSolver::delete_solver()
@@ -545,6 +591,55 @@ StpSolver::configure_opmgr(OpKindManager* opmgr) const
 }
 
 void
+StpSolver::configure_options(SolverManager* smgr)
+{
+#ifdef MURXLA_STP_HAVE_ABSTRACTION_OPTS
+  /* Registered so a run can pin them with -o or sweep them with --fuzz-opts;
+   * registering them does not by itself make murxla touch them, since option
+   * fuzzing is opt-in. Defaults are the members in the header, which say why
+   * each is what it is.
+   *
+   * The widths are bounded by murxla's own bit-width ceiling: a floor above
+   * the widest bit-vector a run can build would silently disable both BV
+   * abstractions rather than test them. */
+  smgr->add_option(new SolverOptionBool(OPT_BV_EQ_ABSTRACTION, true));
+  smgr->add_option(new SolverOptionBool(OPT_BV_TERM_ABSTRACTION, true));
+  smgr->add_option(new SolverOptionBool(OPT_UF_NARROW_RESULTS, true));
+  smgr->add_option(new SolverOptionBool(OPT_UF_INJECT_ARGS, true));
+  smgr->add_option(new SolverOptionNum<uint32_t>(
+      OPT_BV_EQ_ABSTRACTION_WIDTH, 1, MURXLA_BW_MAX, 1));
+  /* 0 refines an inconsistent equality over its whole width at once; any
+   * other value starts at that prefix and doubles per refinement. */
+  smgr->add_option(new SolverOptionNum<uint32_t>(
+      OPT_BV_EQ_REFINE_WIDTH, 0, MURXLA_BW_MAX, 1));
+#endif
+#ifdef MURXLA_STP_HAVE_REFINEMENT_OPTS
+  smgr->add_option(new SolverOptionBool(OPT_BV_TERM_ABSTRACTION_MULT, true));
+  /* 0 never escalates and enumerates operand pairs without limit, which is
+   * what this was before the escalation existed; the top of the range is well
+   * past what a query this size reaches, so a swept value lands on both sides
+   * of the boundary. */
+  smgr->add_option(
+      new SolverOptionNum<uint32_t>(OPT_BV_TERM_ABSTRACTION_ROUNDS, 0, 64, 4));
+  /* 0 installs every conflict a refuted candidate exposes; 1 is STP's
+   * one-lemma-per-round reference profile. */
+  smgr->add_option(
+      new SolverOptionNum<uint32_t>(OPT_UF_LEMMAS_PER_ROUND, 0, 16, 8));
+  smgr->add_option(new SolverOptionList(
+      OPT_UF_ACKERMANN, {"auto", "on", "off"}, "auto"));
+  smgr->add_option(
+      new SolverOptionNum<uint32_t>(OPT_UF_ACKERMANN_BUDGET, 0, 1024, 256));
+  smgr->add_option(new SolverOptionBool(OPT_UF_PHASE_HINTS, false));
+  smgr->add_option(new SolverOptionBool(OPT_DISTINCT_ORDERING, true));
+  /* Bounded well below what a query this size builds so that a swept budget
+   * actually bites: a range up in the millions would be indistinguishable
+   * from the unlimited default. 0 is that default and stays reachable. */
+  smgr->add_option(
+      new SolverOptionNum<uint32_t>(OPT_AIG_NODE_BUDGET, 0, 4096, 0));
+#endif
+}
+
+void
 StpSolver::disable_unsupported_actions(FSM* fsm) const
 {
   /* STP's C API has no way to define functions/macros. */
@@ -631,6 +726,110 @@ StpSolver::set_opt(const std::string& opt, const std::string& value)
   {
     d_model_gen = value == "true";
   }
+#ifdef MURXLA_STP_HAVE_ABSTRACTION_OPTS
+  else if (opt == OPT_BV_EQ_ABSTRACTION || opt == OPT_BV_TERM_ABSTRACTION
+           || opt == OPT_UF_NARROW_RESULTS || opt == OPT_UF_INJECT_ARGS
+           || opt == OPT_BV_EQ_ABSTRACTION_WIDTH
+           || opt == OPT_BV_EQ_REFINE_WIDTH)
+  {
+    /* "true"/"false" is what the registered options pick; 0/1 is what a hand
+     * written -o is likely to say. */
+    bool bval = value == "true" || value == "1";
+    if (opt == OPT_BV_EQ_ABSTRACTION)
+    {
+      d_bv_eq_abstraction = bval;
+    }
+    else if (opt == OPT_BV_TERM_ABSTRACTION)
+    {
+      d_bv_term_abstraction = bval;
+    }
+    else if (opt == OPT_UF_NARROW_RESULTS)
+    {
+      d_uf_narrow_results = bval;
+    }
+    else if (opt == OPT_UF_INJECT_ARGS)
+    {
+      d_uf_inject_args = bval;
+    }
+    else
+    {
+      uint32_t width = static_cast<uint32_t>(std::stoul(value));
+      if (opt == OPT_BV_EQ_ABSTRACTION_WIDTH)
+      {
+        d_bv_eq_abstraction_width = width;
+      }
+      else
+      {
+        d_bv_eq_refine_width = width;
+      }
+    }
+    /* Re-push the whole set: the checker already exists, and reset() will
+     * push it again into the one it builds next. */
+    apply_abstraction_opts();
+  }
+#endif
+#ifdef MURXLA_STP_HAVE_REFINEMENT_OPTS
+  else if (opt == OPT_BV_TERM_ABSTRACTION_MULT || opt == OPT_UF_PHASE_HINTS
+           || opt == OPT_DISTINCT_ORDERING)
+  {
+    bool bval = value == "true" || value == "1";
+    if (opt == OPT_BV_TERM_ABSTRACTION_MULT)
+    {
+      d_bv_term_abstraction_mult = bval;
+    }
+    else if (opt == OPT_UF_PHASE_HINTS)
+    {
+      d_uf_phase_hints = bval;
+    }
+    else
+    {
+      d_distinct_ordering = bval;
+    }
+    apply_abstraction_opts();
+  }
+  else if (opt == OPT_UF_ACKERMANN)
+  {
+    /* An enumeration on STP's side, so the registered spellings are mapped
+     * here; a hand written -o may also give the encoded number directly. */
+    if (value == "auto" || value == "0")
+    {
+      d_uf_ackermann = 0;
+    }
+    else if (value == "on" || value == "1")
+    {
+      d_uf_ackermann = 1;
+    }
+    else
+    {
+      assert(value == "off" || value == "2");
+      d_uf_ackermann = 2;
+    }
+    apply_abstraction_opts();
+  }
+  else if (opt == OPT_BV_TERM_ABSTRACTION_ROUNDS
+           || opt == OPT_UF_LEMMAS_PER_ROUND || opt == OPT_UF_ACKERMANN_BUDGET
+           || opt == OPT_AIG_NODE_BUDGET)
+  {
+    uint32_t num = static_cast<uint32_t>(std::stoul(value));
+    if (opt == OPT_BV_TERM_ABSTRACTION_ROUNDS)
+    {
+      d_bv_term_abstraction_rounds = num;
+    }
+    else if (opt == OPT_UF_LEMMAS_PER_ROUND)
+    {
+      d_uf_lemmas_per_round = num;
+    }
+    else if (opt == OPT_UF_ACKERMANN_BUDGET)
+    {
+      d_uf_ackermann_budget = num;
+    }
+    else
+    {
+      d_aig_node_budget = num;
+    }
+    apply_abstraction_opts();
+  }
+#endif
   /* All other options (including produce-unsat-assumptions and
    * produce-unsat-cores, which STP does not support and which thus remain
    * disabled) are ignored. */
@@ -1734,6 +1933,52 @@ StpSolver::assert_formula(const Term& t)
 }
 
 Solver::Result
+StpSolver::to_result(int32_t res) const
+{
+  if (res == 0) return Result::SAT;
+  if (res == 1) return Result::UNSAT;
+  /* 2 is "errors occurred", which STP reports for a malformed call rather
+   * than for a query it could not settle -- the wrapper should never provoke
+   * one. 3 is a budget the SAT solver enforces (the clock or the conflict
+   * count), 4 is a no-answer that no budget of ours could have caused. */
+  MURXLA_TEST(res == 3 || res == 4);
+#ifdef MURXLA_STP_HAVE_REASON_UNKNOWN
+  /* The two carry different causes, and each promises which: a verdict that
+   * says "a clock stopped me" when no clock did is exactly what splitting 3
+   * from 4 was for, so hold STP to it. */
+  enum reason_unknown_t reason = vc_getReasonUnknown(d_solver);
+  if (res == 3)
+  {
+    /* NONE is the clock too: it is what the pipeline's own checks see when
+     * the budget expires before any solver ran and had a reason to record. */
+    MURXLA_TEST(reason == REASON_UNKNOWN_NONE
+                || reason == REASON_UNKNOWN_TIMEOUT
+                || reason == REASON_UNKNOWN_CONFLICT_BUDGET);
+  }
+  else
+  {
+    MURXLA_TEST(reason == REASON_UNKNOWN_INCOMPLETE
+                || reason == REASON_UNKNOWN_AIG_BUDGET
+                || reason == REASON_UNKNOWN_CARRIER_EXHAUSTED
+                || reason == REASON_UNKNOWN_ASSUMED_INJECTIVITY);
+#ifdef MURXLA_STP_HAVE_REFINEMENT_OPTS
+    /* The AIG budget is the only one of those four we can ask for, so it is
+     * the only one that may appear when we did not. */
+    MURXLA_TEST(reason != REASON_UNKNOWN_AIG_BUDGET
+                || d_aig_node_budget != 0);
+#endif
+  }
+  /* Always a buffer to free, empty when the cause needs no sentence. */
+  char* detail = nullptr;
+  size_t len    = 0;
+  vc_getReasonUnknownToBuffer(d_solver, &detail, &len);
+  MURXLA_TEST(detail != nullptr && len == strlen(detail) + 1);
+  free(detail);
+#endif
+  return Result::UNKNOWN;
+}
+
+Solver::Result
 StpSolver::check_sat()
 {
   pop_pending_assumption_scope();
@@ -1748,10 +1993,7 @@ StpSolver::check_sat()
   {
     res = vc_query(d_solver, ff);
   }
-  if (res == 0) return Result::SAT;
-  if (res == 1) return Result::UNSAT;
-  MURXLA_TEST(res == 3);
-  return Result::UNKNOWN;
+  return to_result(res);
 }
 
 Solver::Result
@@ -1768,11 +2010,7 @@ StpSolver::check_sat_assuming(const std::vector<Term>& assumptions)
   {
     vc_assertFormula(d_solver, StpTerm::get_stp_term(t));
   }
-  int32_t res = vc_query(d_solver, vc_falseExpr(d_solver));
-  if (res == 0) return Result::SAT;
-  if (res == 1) return Result::UNSAT;
-  MURXLA_TEST(res == 3);
-  return Result::UNKNOWN;
+  return to_result(vc_query(d_solver, vc_falseExpr(d_solver)));
 }
 
 std::vector<Term>
