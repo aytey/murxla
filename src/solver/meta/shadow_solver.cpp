@@ -491,6 +491,24 @@ ShadowTerm::is_const() const
   return d_term->is_const();
 }
 
+bool
+ShadowTerm::is_value() const
+{
+  /* Delegated for the same reason is_const is: AbsTerm answers from the leaf
+   * kind recorded on the wrapper, and a solver whose own is_value corrects for
+   * something the leaf kind cannot see -- STP drops the VALUE leaf kind when it
+   * hash-conses a value onto an equal cached node -- would have that correction
+   * ignored. Only the solver under test is asked; the checking solver's view of
+   * what is a value is not what is being tested. */
+  return d_term->is_value();
+}
+
+bool
+ShadowTerm::is_var() const
+{
+  return d_term->is_var();
+}
+
 void
 ShadowTerm::set_sort(Sort sort)
 {

@@ -107,6 +107,8 @@ class ShadowTerm : public AbsTerm
   bool is_string_value() const override;
   bool is_special_value(const SpecialValueKind& kind) const override;
   bool is_const() const override;
+  bool is_value() const override;
+  bool is_var() const override;
   void set_sort(Sort sort) override;
 
   void set_special_value_kind(const SpecialValueKind& value_kind) override;
