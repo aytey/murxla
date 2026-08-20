@@ -1277,6 +1277,12 @@ ShadowSolver::can_get_value(const Term& term) const
 }
 
 void
+ShadowSolver::configure_options(SolverManager* smgr)
+{
+  d_solver->configure_options(smgr);
+}
+
+void
 ShadowSolver::disable_unsupported_actions(FSM* fsm) const
 {
   d_solver->disable_unsupported_actions(fsm);

@@ -237,6 +237,22 @@ class ShadowSolver : public Solver
 
   void disable_unsupported_actions(FSM* fsm) const override;
 
+  /**
+   * Register the options of the solver under test for option fuzzing.
+   *
+   * Without this, wrapping a solver for cross-checking or unsat-core checking
+   * silently drops every solver specific option: `Solver::configure_options`
+   * is a no-op, so `ActionSetOption` only ever sees the four options it knows
+   * by name (incremental, model generation, unsat cores and assumptions), and
+   * a wrapped run pins everything else at the wrapper's own defaults.
+   *
+   * Only the solver under test is registered. The checking solver is reached
+   * through `MURXLA_CHECK_SOLVER_OPT_PREFIX` (see `get_required_options`) and
+   * fuzzing it would change what the reference does, not what is being
+   * tested.
+   */
+  void configure_options(SolverManager* smgr) override;
+
  protected:
   /** The solver under test. */
   std::unique_ptr<Solver> d_solver;
