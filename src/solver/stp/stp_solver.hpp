@@ -215,6 +215,20 @@ class StpSolver : public Solver
 
   void configure_opmgr(OpKindManager* opmgr) const override;
   void configure_options(SolverManager* smgr) override;
+
+  /**
+   * Declare the abstraction and UF encoding settings this wrapper overrides
+   * STP's own defaults with, so that they reach the trace.
+   *
+   * They used to be pushed straight into the checker in new_solver(), which
+   * left them out of the trace entirely: a recorded run named none of the
+   * fourteen vc_setInterfaceFlags values it was actually using, so replaying
+   * it under a later wrapper silently ran a different solver. Declared here
+   * they are applied through ActionSetOption and written down, and a trace
+   * pins the configuration it ran under.
+   */
+  std::unordered_map<std::string, std::string> get_required_options(
+      Theory theory) const override;
   void disable_unsupported_actions(FSM* fsm) const override;
 
   bool is_unsat_assumption(const Term& t) const override;

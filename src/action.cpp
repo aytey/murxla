@@ -517,6 +517,19 @@ ActionSetOptionReq::generate()
       d_setoption->run(name, options.at(name)->pick_value(d_rng));
     }
   }
+  /* Last: the defaults a wrapper declared through get_required_options(). They
+   * fill in whatever -o and option fuzzing left alone, and because they go
+   * through ActionSetOption they are written to the trace like any other
+   * set-option. That is the point of applying them here rather than having the
+   * wrapper push them silently when it builds the solver: a trace that does
+   * not name the configuration it ran under cannot be replayed once the
+   * wrapper's defaults change, which is exactly what made the 17-18 August
+   * campaign failures impossible to triage afterwards. */
+  for (const auto& [name, value] : d_required_options)
+  {
+    if (d_smgr.is_option_used(name)) continue;
+    d_setoption->run(name, value);
+  }
   return true;
 }
 
@@ -529,10 +542,17 @@ ActionSetOptionReq::untrace(const std::vector<std::string>& tokens)
 void
 ActionSetOptionReq::init(
     const std::vector<std::pair<std::string, std::string>>& solver_options,
+    const std::vector<std::pair<std::string, std::string>>& required_options,
     ActionSetOption* setoption)
 {
   d_solver_options.insert(
       d_solver_options.end(), solver_options.begin(), solver_options.end());
+  d_required_options.insert(d_required_options.end(),
+                            required_options.begin(),
+                            required_options.end());
+  /* Sorted so the trace reads the same way every run; they arrive from an
+   * unordered_map. */
+  std::sort(d_required_options.begin(), d_required_options.end());
   d_setoption = setoption;
 }
 

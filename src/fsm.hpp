@@ -639,6 +639,12 @@ class FSM
   statistics::Statistics* d_mbt_stats;
 
   std::vector<std::pair<std::string, std::string>> d_solver_options;
+  /**
+   * Options a solver wrapper declares through get_required_options(). Applied
+   * after -o and after option fuzzing, so they fill in what nothing else set
+   * -- and, being applied through ActionSetOption, they land in the trace.
+   */
+  std::vector<std::pair<std::string, std::string>> d_required_options;
 
   SolverProfile& d_solver_profile;
 };

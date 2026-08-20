@@ -516,10 +516,12 @@ class ActionSetOptionReq : public Action
 
   void init(
       const std::vector<std::pair<std::string, std::string>>& solver_options,
+      const std::vector<std::pair<std::string, std::string>>& required_options,
       ActionSetOption* setoption);
 
  private:
   std::vector<std::pair<std::string, std::string>> d_solver_options;
+  std::vector<std::pair<std::string, std::string>> d_required_options;
   ActionSetOption* d_setoption;
 };
 

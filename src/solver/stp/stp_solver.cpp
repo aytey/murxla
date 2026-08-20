@@ -590,6 +590,51 @@ StpSolver::configure_opmgr(OpKindManager* opmgr) const
   opmgr->add_op_kind(OP_SMULO, 2, 0, SORT_BOOL, {SORT_BV}, THEORY_BV);
 }
 
+std::unordered_map<std::string, std::string>
+StpSolver::get_required_options(Theory theory) const
+{
+  std::unordered_map<std::string, std::string> reqopts;
+  /* Anchored to one theory so the set is declared once; THEORY_BOOL is always
+   * enabled. The values must agree with the members these mirror -- they are
+   * the same defaults, said out loud. */
+#if defined(MURXLA_STP_HAVE_ABSTRACTION_OPTS)
+  if (theory == THEORY_BOOL)
+  {
+    reqopts.emplace(OPT_BV_EQ_ABSTRACTION, d_bv_eq_abstraction ? "true" : "false");
+    reqopts.emplace(OPT_BV_TERM_ABSTRACTION,
+                    d_bv_term_abstraction ? "true" : "false");
+    reqopts.emplace(OPT_BV_EQ_ABSTRACTION_WIDTH,
+                    std::to_string(d_bv_eq_abstraction_width));
+    reqopts.emplace(OPT_BV_EQ_REFINE_WIDTH,
+                    std::to_string(d_bv_eq_refine_width));
+    reqopts.emplace(OPT_UF_NARROW_RESULTS,
+                    d_uf_narrow_results ? "true" : "false");
+    reqopts.emplace(OPT_UF_INJECT_ARGS, d_uf_inject_args ? "true" : "false");
+#ifdef MURXLA_STP_HAVE_REFINEMENT_OPTS
+    reqopts.emplace(OPT_BV_TERM_ABSTRACTION_MULT,
+                    d_bv_term_abstraction_mult ? "true" : "false");
+    reqopts.emplace(OPT_BV_TERM_ABSTRACTION_ROUNDS,
+                    std::to_string(d_bv_term_abstraction_rounds));
+    reqopts.emplace(OPT_UF_LEMMAS_PER_ROUND,
+                    std::to_string(d_uf_lemmas_per_round));
+    reqopts.emplace(OPT_UF_ACKERMANN,
+                    d_uf_ackermann == 0   ? "auto"
+                    : d_uf_ackermann == 1 ? "on"
+                                          : "off");
+    reqopts.emplace(OPT_UF_ACKERMANN_BUDGET,
+                    std::to_string(d_uf_ackermann_budget));
+    reqopts.emplace(OPT_UF_PHASE_HINTS, d_uf_phase_hints ? "true" : "false");
+    reqopts.emplace(OPT_DISTINCT_ORDERING,
+                    d_distinct_ordering ? "true" : "false");
+    reqopts.emplace(OPT_AIG_NODE_BUDGET, std::to_string(d_aig_node_budget));
+#endif
+  }
+#else
+  (void) theory;
+#endif
+  return reqopts;
+}
+
 void
 StpSolver::configure_options(SolverManager* smgr)
 {

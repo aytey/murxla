@@ -193,7 +193,11 @@ FSM::FSM(RNGenerator& rng,
     auto reqopts = d_smgr.get_required_options(t);
     for (const auto& [opt, val] : reqopts)
     {
-      d_solver_options.emplace_back(opt, val);
+      /* Kept apart from the -o list: these are defaults a wrapper wants
+       * recorded, so they must not outrank an explicit -o, nor a value option
+       * fuzzing picked. ActionSetOptionReq applies them last, filling in only
+       * what nothing else set. */
+      d_required_options.emplace_back(opt, val);
     }
   }
 
@@ -390,7 +394,7 @@ FSM::configure()
 
   auto a_setoption = new_action<ActionSetOption>();
   auto a_setoptionreq = new_action<ActionSetOptionReq>();
-  a_setoptionreq->init(d_solver_options, a_setoption);
+  a_setoptionreq->init(d_solver_options, d_required_options, a_setoption);
 
   auto a_set_logic = new_action<ActionSetLogic>();
 
